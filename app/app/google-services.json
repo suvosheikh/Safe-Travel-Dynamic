@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "384296469700",
+    "project_id": "safe-travel-1984b",
+    "storage_bucket": "safe-travel-1984b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384296469700:android:bb11883a16270b6201f591",
+        "android_client_info": {
+          "package_name": "com.safetravel.tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGwaqH8l7DGRT0qN99U9kcl0V8xm88GHk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

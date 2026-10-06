@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-mono), monospace;
+}
+
+/* Force Bengali Font when language is Bengali, but keep Material Icons intact */
+:lang(bn):not(.material-icons), :lang(bn) *:not(.material-icons) {
+  font-family: 'Hind Siliguri', sans-serif !important;
+}
+
+@keyframes soundPulse {
+  0%, 100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1.3);
+  }
+}

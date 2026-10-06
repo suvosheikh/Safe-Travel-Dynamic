@@ -1,0 +1,6 @@
+{
+  "name": "Safe Travel Admin Dashboard",
+  "description": "Admin web dashboard for safe travel monitoring, user status management, active trip tracking, SOS log feeds, and points logs.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

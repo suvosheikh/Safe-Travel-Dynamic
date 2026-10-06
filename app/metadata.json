@@ -1,0 +1,6 @@
+{
+  "name": "Safe Travel",
+  "description": "Safe Travel secure mobile application with real-time panic/SOS, trip tracking, and active dispatcher/user profile simulations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

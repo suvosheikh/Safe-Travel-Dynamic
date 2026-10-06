@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  .container {
+    width: 44px;
+    height: 44px;
+    background: rgba(0,255,0,0.3);
+    position: relative;
+    margin: 100px auto;
+  }
+  .gps-map-pin {
+    width: 28px;
+    height: 28px;
+    background: red;
+    border-radius: 50% 50% 50% 0;
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform-origin: 0% 100%;
+    transform: rotate(-45deg);
+  }
+  .center-line {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: black;
+  }
+  .bottom-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: black;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="center-line"></div>
+    <div class="bottom-line"></div>
+    <div class="gps-map-pin"></div>
+  </div>
+</body>
+</html>
