@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
-        <!-- Strictly disable Android OS algorithmic force-dark inversion (protects all UI colors on Xiaomi, Samsung, Oppo, etc.) -->
+        <!-- Keep identical custom glass aesthetic and disable force dark when system is in dark mode -->
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
     </style>
 </resources>
