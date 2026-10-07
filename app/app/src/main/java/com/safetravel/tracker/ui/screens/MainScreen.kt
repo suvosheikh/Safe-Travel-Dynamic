@@ -261,6 +261,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
     }
     
     var showNotificationDialog by remember { mutableStateOf(false) }
+    var showNotificationTray by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
@@ -692,7 +693,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                         ) {
                             // Notification Icon
                             IconButton(
-                                onClick = { showNotificationDialog = true },
+                                onClick = { showNotificationTray = true },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -1036,6 +1037,24 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
         }
     }
 }
+
+    // --- SMART NOTIFICATION TRAY ---
+    if (showNotificationTray) {
+        com.safetravel.tracker.ui.components.NotificationTrayBottomSheet(
+            vm = vm,
+            onDismiss = { showNotificationTray = false },
+            onNavigateToTab = { tabIndex ->
+                resetSubScreens()
+                selectedTab = tabIndex
+            },
+            onNewsClick = { news ->
+                selectedNews = news
+            },
+            onOpenSosSettings = {
+                showNotificationDialog = true
+            }
+        )
+    }
 
     // --- DIALOG POPUPS FOR SIDEBAR ITEMS ---
 
