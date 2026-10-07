@@ -226,61 +226,109 @@ fun PremiumScreen(
 
             // Pending Transaction Alert Card
             if (pendingTx != null) {
+                val pendingPlan = plans.firstOrNull { it.id == pendingTx.planId }
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2210)),
-                        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f))
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1A11)),
+                        border = BorderStroke(1.2.dp, Color(0xFFF59E0B).copy(alpha = 0.7f))
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.HourglassTop,
-                                    contentDescription = null,
-                                    tint = Color(0xFFF59E0B),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "PAYMENT VERIFICATION PENDING",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color(0xFFF59E0B)
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.HourglassTop,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "VERIFICATION IN PROGRESS",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFFF59E0B),
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+
+                                Surface(
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = "OPS REVIEW",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFFF59E0B),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "Your manual mobile payment submission is under review by our operations room.",
-                                fontSize = 12.sp,
-                                color = Slate200,
-                                lineHeight = 16.sp
-                            )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                            Text(
+                                text = "Your manual mobile payment verification request is under active review by the operations center. New plan subscriptions are temporarily locked until review is completed.",
+                                fontSize = 12.sp,
+                                color = Slate300,
+                                lineHeight = 16.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Surface(
+                                color = Slate900.copy(alpha = 0.8f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Slate800)
                             ) {
-                                Text(
-                                    text = "Amount: BDT ${pendingTx.amount.toInt()}",
-                                    fontSize = 11.sp,
-                                    color = Slate300,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "TrxID: ${pendingTx.transactionId}",
-                                    fontSize = 11.sp,
-                                    color = Cyan400,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (pendingPlan != null) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(text = "Requested Plan:", fontSize = 11.sp, color = Slate400)
+                                            Text(text = pendingPlan.name, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "Payment Method:", fontSize = 11.sp, color = Slate400)
+                                        Text(text = pendingTx.paymentMethod.uppercase(), fontSize = 11.sp, color = Cyan400, fontWeight = FontWeight.Bold)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "Amount Paid:", fontSize = 11.sp, color = Slate400)
+                                        Text(text = "BDT ${pendingTx.amount.toInt()}", fontSize = 11.sp, color = PremiumGold, fontWeight = FontWeight.Black)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "Transaction ID (TrxID):", fontSize = 11.sp, color = Slate400)
+                                        Text(text = pendingTx.transactionId, fontSize = 11.sp, color = Emerald400, fontWeight = FontWeight.Black)
+                                    }
+                                }
                             }
                         }
                     }
@@ -476,34 +524,43 @@ fun PremiumScreen(
 
                             Spacer(modifier = Modifier.height(20.dp))
 
+                            val hasPending = pendingTx != null
                             // CTA Subscribe Button
                             Button(
                                 onClick = {
-                                    checkoutPlan = plan
-                                    senderNumber = profile?.phoneNumber ?: ""
-                                    transactionId = ""
+                                    if (hasPending) {
+                                        Toast.makeText(
+                                            context,
+                                            "You have a pending verification request. Please wait for admin approval.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } else {
+                                        checkoutPlan = plan
+                                        senderNumber = profile?.phoneNumber ?: ""
+                                        transactionId = ""
+                                    }
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (plan.isPopular) PremiumGold else Cyan500
+                                    containerColor = if (hasPending) Slate800 else if (plan.isPopular) PremiumGold else Cyan500
                                 )
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = Icons.Default.Payment,
+                                        imageVector = if (hasPending) Icons.Default.HourglassTop else Icons.Default.Payment,
                                         contentDescription = null,
-                                        tint = Slate950,
+                                        tint = if (hasPending) Color(0xFFF59E0B) else Slate950,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Subscribe via Mobile Banking",
+                                        text = if (hasPending) "Verification In Progress" else "Subscribe via Mobile Banking",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = Slate950
+                                        color = if (hasPending) Color(0xFFF59E0B) else Slate950
                                     )
                                 }
                             }
@@ -514,31 +571,42 @@ fun PremiumScreen(
         }
 
         // Checkout & Manual Payment Modal
-        if (checkoutPlan != null) {
+        if (checkoutPlan != null && pendingTx == null) {
             val effectivePrice = (checkoutPlan!!.discountPrice ?: checkoutPlan!!.price).toInt()
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            var isNumberCopied by remember { mutableStateOf(false) }
 
             ModalBottomSheet(
                 onDismissRequest = { if (!isSubmittingPayment) checkoutPlan = null },
                 sheetState = sheetState,
                 containerColor = Color.Transparent,
-                scrimColor = Color.Black.copy(alpha = 0.70f),
+                scrimColor = Color.Black.copy(alpha = 0.75f),
                 dragHandle = null,
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             ) {
                 GlassBottomSheetContainer(
                     topStartRadius = 28.dp,
                     topEndRadius = 28.dp,
-                    maxHeightFraction = 0.90f,
+                    maxHeightFraction = 0.92f,
                     scrollable = true
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 4.dp)
+                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                            .navigationBarsPadding()
                             .imePadding()
                     ) {
-                        // Header
+                        // Top Drag Handle Bar
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(top = 4.dp, bottom = 12.dp)
+                                .size(width = 44.dp, height = 4.dp)
+                                .background(Slate600.copy(alpha = 0.6f), CircleShape)
+                        )
+
+                        // Header with Icon, Title, and Close Button
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -550,27 +618,27 @@ fun PremiumScreen(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(38.dp)
-                                        .background(Cyan500.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-                                        .border(1.dp, Cyan500.copy(alpha = 0.35f), RoundedCornerShape(10.dp)),
+                                        .size(40.dp)
+                                        .background(Cyan500.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                        .border(1.dp, Cyan500.copy(alpha = 0.35f), RoundedCornerShape(12.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.VerifiedUser,
+                                        imageVector = Icons.Default.Shield,
                                         contentDescription = null,
                                         tint = Cyan400,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                                 Column {
                                     Text(
                                         text = "Upgrade Plan Checkout",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Black,
                                         color = Color.White
                                     )
                                     Text(
-                                        text = "Manual Mobile Payment & Verification",
+                                        text = "Verified Manual Mobile Payment",
                                         fontSize = 11.sp,
                                         color = Slate400
                                     )
@@ -581,25 +649,25 @@ fun PremiumScreen(
                                 onClick = { if (!isSubmittingPayment) checkoutPlan = null },
                                 modifier = Modifier
                                     .size(32.dp)
-                                    .background(Slate800.copy(alpha = 0.7f), CircleShape)
+                                    .background(Slate800.copy(alpha = 0.8f), CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Close",
-                                    tint = Slate400,
+                                    tint = Slate300,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // Plan Summary Card
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             color = Slate900.copy(alpha = 0.85f),
-                            border = BorderStroke(1.dp, PremiumGold.copy(alpha = 0.4f))
+                            border = BorderStroke(1.dp, PremiumGold.copy(alpha = 0.45f))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -614,7 +682,7 @@ fun PremiumScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(42.dp)
                                             .background(PremiumGold.copy(alpha = 0.15f), CircleShape)
                                             .border(1.dp, PremiumGold.copy(alpha = 0.4f), CircleShape),
                                         contentAlignment = Alignment.Center
@@ -623,18 +691,23 @@ fun PremiumScreen(
                                             imageVector = Icons.Default.WorkspacePremium,
                                             contentDescription = null,
                                             tint = PremiumGold,
-                                            modifier = Modifier.size(22.dp)
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
                                     Column {
                                         Text(
                                             text = checkoutPlan!!.name,
                                             fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.Black,
                                             color = Color.White
                                         )
+                                        val durationLabel = when {
+                                            checkoutPlan!!.billingPeriod == "pay_per_trip" -> "Pay-Per-Trip Access"
+                                            checkoutPlan!!.durationDays == 1 -> "1 Day Full Protection"
+                                            else -> "${checkoutPlan!!.durationDays} Days Full Protection"
+                                        }
                                         Text(
-                                            text = "${checkoutPlan!!.durationDays} Days Full Protection",
+                                            text = durationLabel,
                                             fontSize = 11.sp,
                                             color = Slate400
                                         )
@@ -660,11 +733,11 @@ fun PremiumScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // Method Selector Chips
                         Text(
-                            text = "SELECT PAYMENT GATEWAY",
+                            text = "SELECT MOBILE OPERATOR",
                             fontSize = 10.sp,
                             color = Slate400,
                             fontWeight = FontWeight.Bold,
@@ -696,13 +769,14 @@ fun PremiumScreen(
                                         .weight(1f)
                                         .clickable {
                                             selectedMethod = key
+                                            isNumberCopied = false
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         }
                                 ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 12.dp),
+                                            .padding(vertical = 11.dp),
                                         horizontalArrangement = Arrangement.Center,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -749,7 +823,7 @@ fun PremiumScreen(
                                         color = Cyan400,
                                         letterSpacing = 0.5.sp
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.height(3.dp))
                                     Text(
                                         text = activeAdminNumber,
                                         fontSize = 17.sp,
@@ -763,26 +837,32 @@ fun PremiumScreen(
                                     onClick = {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                         clipboard.setPrimaryClip(ClipData.newPlainText("Payment Number", activeAdminNumber))
+                                        isNumberCopied = true
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         Toast.makeText(context, "Number copied: $activeAdminNumber", Toast.LENGTH_SHORT).show()
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Cyan500.copy(alpha = 0.2f)),
-                                    border = BorderStroke(1.dp, Cyan500.copy(alpha = 0.5f)),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isNumberCopied) Emerald500.copy(alpha = 0.25f) else Cyan500.copy(alpha = 0.2f)
+                                    ),
+                                    border = BorderStroke(
+                                        1.dp, 
+                                        if (isNumberCopied) Emerald400 else Cyan500.copy(alpha = 0.5f)
+                                    ),
                                     shape = RoundedCornerShape(10.dp),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                     modifier = Modifier.height(36.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ContentCopy,
+                                        imageVector = if (isNumberCopied) Icons.Default.Check else Icons.Default.ContentCopy,
                                         contentDescription = null,
-                                        tint = Cyan400,
+                                        tint = if (isNumberCopied) Emerald400 else Cyan400,
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "COPY",
+                                        text = if (isNumberCopied) "COPIED" else "COPY",
                                         fontSize = 11.sp,
-                                        color = Cyan400,
+                                        color = if (isNumberCopied) Emerald400 else Cyan400,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -793,7 +873,7 @@ fun PremiumScreen(
 
                         // 3-Step Instruction Box
                         Surface(
-                            color = Slate950.copy(alpha = 0.5f),
+                            color = Slate950.copy(alpha = 0.6f),
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, Slate800)
                         ) {
@@ -801,42 +881,56 @@ fun PremiumScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = Icons.Default.Info,
+                                        imageVector = Icons.Default.HelpOutline,
                                         contentDescription = null,
-                                        tint = Slate400,
-                                        modifier = Modifier.size(13.dp)
+                                        tint = Cyan400,
+                                        modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "3-Step Payment Instructions:",
-                                        fontSize = 11.sp,
+                                        text = "3-Step Payment Guide",
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Slate300
+                                        color = Slate200
                                     )
                                 }
 
-                                Text(
-                                    text = "1. Open your ${selectedMethod.replaceFirstChar { it.uppercase() }} app and select 'Send Money'.",
-                                    fontSize = 11.sp,
-                                    color = Slate400,
-                                    lineHeight = 15.sp
-                                )
-                                Text(
-                                    text = "2. Send exactly BDT $effectivePrice to $activeAdminNumber.",
-                                    fontSize = 11.sp,
-                                    color = Slate400,
-                                    lineHeight = 15.sp
-                                )
-                                Text(
-                                    text = "3. Copy the TrxID (Transaction ID) from the confirmation and paste it below.",
-                                    fontSize = 11.sp,
-                                    color = Slate400,
-                                    lineHeight = 15.sp
-                                )
+                                listOf(
+                                    "1" to "Open your ${selectedMethod.replaceFirstChar { it.uppercase() }} app and select 'Send Money'.",
+                                    "2" to "Send exactly BDT $effectivePrice to $activeAdminNumber.",
+                                    "3" to "Copy the TrxID from confirmation SMS/app and paste below."
+                                ).forEach { (step, text) ->
+                                    Row(
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Surface(
+                                            color = Slate800,
+                                            shape = CircleShape,
+                                            modifier = Modifier.size(18.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = step,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = Cyan400
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = text,
+                                            fontSize = 11.sp,
+                                            color = Slate400,
+                                            lineHeight = 15.sp,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -846,7 +940,7 @@ fun PremiumScreen(
                         OutlinedTextField(
                             value = senderNumber,
                             onValueChange = { senderNumber = it },
-                            label = { Text("Your Sender Mobile Number") },
+                            label = { Text("Sender Mobile Number *") },
                             placeholder = { Text("01XXXXXXXXX") },
                             leadingIcon = {
                                 Icon(
@@ -874,7 +968,7 @@ fun PremiumScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Input: Transaction ID (TrxID)
+                        // Input: Transaction ID (TrxID) with Quick Paste Button
                         OutlinedTextField(
                             value = transactionId,
                             onValueChange = { transactionId = it.trim().uppercase() },
@@ -887,6 +981,29 @@ fun PremiumScreen(
                                     tint = Cyan400,
                                     modifier = Modifier.size(18.dp)
                                 )
+                            },
+                            trailingIcon = {
+                                TextButton(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()?.trim()?.uppercase()
+                                        if (!clipText.isNullOrBlank()) {
+                                            transactionId = clipText
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            Toast.makeText(context, "TrxID Pasted", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Clipboard empty", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp)
+                                ) {
+                                    Text(
+                                        text = "PASTE",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Cyan400
+                                    )
+                                }
                             },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
@@ -904,7 +1021,7 @@ fun PremiumScreen(
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(18.dp))
 
                         // Submit Button
                         Button(
@@ -957,7 +1074,8 @@ fun PremiumScreen(
                             if (isSubmittingPayment) {
                                 CircularProgressIndicator(
                                     color = Slate950,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
                                 )
                             } else {
                                 Row(
@@ -965,13 +1083,13 @@ fun PremiumScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Verified,
+                                        imageVector = Icons.Default.CheckCircle,
                                         contentDescription = null,
                                         tint = Slate950,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Text(
-                                        text = "Submit TrxID for Verification",
+                                        text = "Confirm & Submit for Verification",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Slate950
@@ -980,7 +1098,29 @@ fun PremiumScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Safety Trust Note
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = Slate500,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Encrypted transaction reviewed by 24/7 Operations Desk",
+                                fontSize = 10.sp,
+                                color = Slate500
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
                     }
                 }
             }

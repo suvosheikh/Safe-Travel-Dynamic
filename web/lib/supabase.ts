@@ -544,7 +544,7 @@ export const fetchInitialData = async (supabase: any): Promise<Partial<DbState>>
       supabase.from("app_remote_configs").select("*"),
       supabase.from("guardians").select("*"),
       supabase.from("subscription_plans").select("*").order("display_order", { ascending: true }),
-      supabase.from("payment_transactions").select("*, profiles(full_name, phone_number), subscription_plans(name, duration_days)").order("created_at", { ascending: false })
+      supabase.from("payment_transactions").select("*, profiles:profiles!payment_transactions_user_id_fkey(full_name, phone_number), subscription_plans(name, duration_days)").order("created_at", { ascending: false })
     ]);
 
     const profiles = profilesRes.data || [];
