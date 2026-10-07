@@ -37,9 +37,33 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
     };
   });
 
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'thresholds' | 'map' | 'cloud_configs' | 'points' | 'ads' | 'versions'>('general');
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'thresholds' | 'map' | 'cloud_configs' | 'points' | 'versions'>('general');
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Display Scaling Preference State ('auto' | 'fhd' | '100')
+  const [displayScale, setDisplayScale] = useState<'auto' | 'fhd' | '100'>('auto');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('safetravel_display_scale') as 'auto' | 'fhd' | '100' | null;
+      if (saved && (saved === 'auto' || saved === 'fhd' || saved === '100')) {
+        setDisplayScale(saved);
+      }
+    }
+  }, []);
+
+  const handleDisplayScaleChange = (scale: 'auto' | 'fhd' | '100') => {
+    setDisplayScale(scale);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-display-scale', scale);
+      try {
+        localStorage.setItem('safetravel_display_scale', scale);
+      } catch {
+        // fallback
+      }
+    }
+  };
 
   // Cloud Remote Configs State
   const [remoteConfigs, setRemoteConfigs] = useState<Record<string, string>>({
@@ -291,14 +315,14 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
               System Settings
             </h2>
             <p className="text-xs text-slate-400 font-sans mt-0.5">
-              Configure telemetry thresholds, emergency dispatcher preferences, map styles, and synchronization engines
+              Configure safety thresholds, emergency contact preferences, map styles, and cloud settings
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2 font-mono text-[10px] text-slate-400">
           <span className="material-icons text-xs text-emerald-500">cloud_done</span>
-          <span>CONFIGURATION ENGINE AUTOMATICALLY SAVES RECENT STATE</span>
+          <span>ALL PREFERENCES AUTOMATICALLY SAVED TO CLOUD</span>
         </div>
       </div>
 
@@ -307,7 +331,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
         <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-4 py-3 rounded-xl flex items-center justify-between animate-fadeIn text-xs font-medium" id="settings-save-toast">
           <div className="flex items-center space-x-2">
             <span className="material-icons text-base text-emerald-600">check_circle</span>
-            <span>System parameters updated successfully. Configurations synced with dispatch cache.</span>
+            <span>Settings updated successfully. Your preferences are saved.</span>
           </div>
           <button 
             type="button" 
@@ -333,8 +357,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
             { id: 'thresholds', label: 'Security & Limits', icon: 'security' },
             { id: 'map', label: 'Map Styles & Tracking', icon: 'map' },
             { id: 'cloud_configs', label: 'Cloud & Remote APIs', icon: 'cloud_sync' },
-            { id: 'points', label: 'Points & Rewards Engine', icon: 'military_tech' },
-            { id: 'ads', label: 'AdMob & Monetization', icon: 'campaign' },
+            { id: 'points', label: 'Points & Rewards', icon: 'military_tech' },
             { id: 'versions', label: 'App Version Logs', icon: 'history' },
           ].map((tab) => {
             const isTabActive = activeSubTab === tab.id;
@@ -387,22 +410,107 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
             <div className="space-y-6" id="general-settings-view">
               <div className="pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                  Operations & Dispatch Controls
+                  Operations & Emergency Alerts
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Configure automated responders and active HUD simulator preferences for dispatch control units
+                  Configure automated emergency alerts and navigation preferences
                 </p>
               </div>
 
               <div className="space-y-5">
+                {/* Display Resolution & FHD Fit Density Engine */}
+                <div className="p-4.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3" id="display-density-control-card">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="block text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase font-mono tracking-wider">
+                        <span className="material-icons text-blue-600 text-sm">fit_screen</span>
+                        Monitor Resolution & Display Density (FHD Fit Engine)
+                      </span>
+                      <span className="block text-[11px] text-slate-500 leading-relaxed">
+                        Optimize dashboard proportions for HD monitors and laptops (1366x768) so all tables, cards, and maps render with spacious Full HD (1920x1080) roominess.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayScaleChange('auto')}
+                      className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
+                        displayScale === 'auto'
+                          ? 'bg-blue-50/80 border-blue-500 text-blue-900 shadow-sm ring-1 ring-blue-500/20'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-mono flex items-center gap-1.5">
+                          <span className="material-icons text-xs text-blue-600">auto_awesome</span>
+                          AUTO FIT
+                        </span>
+                        <span className="text-[9px] font-mono font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                          RECOMMENDED
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-2.5 leading-relaxed">
+                        Auto-detects screen resolution: Automatically applies 85% scale on HD/Laptop screens, and standard 100% on FHD monitors.
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayScaleChange('fhd')}
+                      className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
+                        displayScale === 'fhd'
+                          ? 'bg-blue-50/80 border-blue-500 text-blue-900 shadow-sm ring-1 ring-blue-500/20'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-mono flex items-center gap-1.5">
+                          <span className="material-icons text-xs text-blue-600">fit_screen</span>
+                          FHD 85%
+                        </span>
+                        <span className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          SPACIOUS
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-2.5 leading-relaxed">
+                        Forces 85% scale on any display for an expansive, uncrowded layout with extra breathing room for tables and maps.
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayScaleChange('100')}
+                      className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
+                        displayScale === '100'
+                          ? 'bg-blue-50/80 border-blue-500 text-blue-900 shadow-sm ring-1 ring-blue-500/20'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-mono flex items-center gap-1.5">
+                          <span className="material-icons text-xs text-blue-600">crop_free</span>
+                          100% STANDARD
+                        </span>
+                        <span className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          DEFAULT
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-2.5 leading-relaxed">
+                        Standard 1:1 original pixel scale. Ideal for large high-resolution 2K/4K external desktop monitors.
+                      </span>
+                    </button>
+                  </div>
+                </div>
                 {/* Auto Dispatch SOS Emergency units Toggle */}
                 <div className="flex items-start justify-between p-4 bg-slate-50 border border-slate-150 rounded-xl hover:bg-slate-50/70 transition-all">
                   <div className="space-y-1 max-w-[80%]">
                     <span className="block text-xs font-semibold text-slate-800">
-                      Auto Dispatch Emergency Response Units
+                      Automatic Emergency Alerts & Notifications
                     </span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">
-                      Automatically initiate real-time emergency responder tracking state and push dispatcher notifications when a passenger triggers the S.O.S alert.
+                      Automatically send real-time alerts and notifications to emergency guardians when an S.O.S alert is triggered.
                     </span>
                   </div>
                   <button
@@ -424,10 +532,10 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                 <div className="flex items-start justify-between p-4 bg-slate-50 border border-slate-150 rounded-xl hover:bg-slate-50/70 transition-all">
                   <div className="space-y-1 max-w-[80%]">
                     <span className="block text-xs font-semibold text-slate-800">
-                      Mute Dispatch Guidance Audio
+                      Mute Voice Navigation Guidance
                     </span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">
-                      Mute high-fidelity simulated voice guidance audio updates on active transit tracks navigation view screen.
+                      Mute voice audio guidance updates during active navigation.
                     </span>
                   </div>
                   <button
@@ -474,10 +582,10 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center p-4 bg-slate-50 border border-slate-150 rounded-xl">
                   <div className="space-y-1">
                     <span className="block text-xs font-semibold text-slate-800">
-                      Radar Telemetry Refresh Interval
+                      Live Map Refresh Interval
                     </span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">
-                      Adjust how frequently (in seconds) the GPS tracking engine recalculates simulated geographic positions.
+                      Adjust how frequently (in seconds) the map updates active trip coordinates.
                     </span>
                   </div>
                   <div className="flex items-center space-x-3">
@@ -504,10 +612,10 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
             <div className="space-y-6" id="thresholds-settings-view">
               <div className="pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                  Security Thresholds & Telemetry Safety Limits
+                  Safety Thresholds & Alert Limits
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Set safety margins to flag abnormal transit vehicles, geofence deviations, or extreme speeding behaviors
+                  Set safety margins to flag unexpected stops, route deviations, or over-speeding
                 </p>
               </div>
 
@@ -520,7 +628,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                       Vehicle Idle Duration Threshold
                     </span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">
-                      Trigger dispatcher warnings if a transit stays in the exact same location coordinates for too long.
+                      Trigger safety warnings if a trip remains stationary in the same location for too long.
                     </span>
                   </div>
                   <div className="flex items-center space-x-3 justify-end">
@@ -544,7 +652,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                       Geofence Route Deviation Limit
                     </span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">
-                      Maximum allowed distance buffer (in meters) before a pilot vehicle is marked as &apos;OFF TRACK&apos;.
+                      Maximum allowed distance (in meters) before a trip is marked as &apos;OFF TRACK&apos;.
                     </span>
                   </div>
                   <div className="flex items-center space-x-3 justify-end">
@@ -568,7 +676,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                       Speed Limit Warning Tolerance Buffer
                     </span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">
-                      Configure speed buffer (mph) above marked lane limits before flashing visual warning signs inside HUD.
+                      Configure speed buffer (mph) above speed limits before showing visual speed warnings.
                     </span>
                   </div>
                   <div className="flex items-center space-x-3 justify-end">
@@ -593,10 +701,10 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
             <div className="space-y-6" id="map-settings-view">
               <div className="pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                  Map display Styles & History Tracking
+                  Map Display Styles & History Tracking
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Set default skin layers and geographic marker historic trace lines limit
+                  Set default map styles and trail history limits
                 </p>
               </div>
 
@@ -606,10 +714,10 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center p-4 bg-slate-50 border border-slate-150 rounded-xl">
                   <div className="space-y-1">
                     <span className="block text-xs font-semibold text-slate-800">
-                      Default Mapbox Style Skin
+                      Default Map Style
                     </span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">
-                      Select default render skin used inside the Live Radar Monitor screen.
+                      Select default style used on the Live Tracking Map.
                     </span>
                   </div>
                   <div className="flex items-center space-x-3 justify-end">
@@ -717,7 +825,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                   <div className="flex items-center gap-2">
                     <span className="material-icons text-cyan-600 text-lg">cloud_upload</span>
                     <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono">
-                      Cloudinary Media & Vault Credentials
+                      Cloudinary Cloud Storage Settings
                     </span>
                   </div>
                   <span className="text-[10px] font-mono text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
@@ -744,7 +852,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
                   {/* Audio Upload Preset */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                      Audio Blackbox Upload Preset
+                      Emergency Audio Upload Preset
                     </label>
                     <input 
                       type="text" 
@@ -1052,415 +1160,7 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
             </div>
           )}
 
-          {/* TAB 6: ADMOB & MONETIZATION */}
-          {activeSubTab === 'ads' && (
-            <div className="space-y-6 animate-fadeIn" id="panel-admob-monetization">
-              <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                    <span className="material-icons text-amber-600 text-lg">campaign</span>
-                    Google AdMob & In-App Advertising Controls
-                  </h3>
-                  <p className="text-slate-500 text-xs mt-0.5">
-                    Centralized mobile advertising configuration, placement controls, and ad unit IDs stored in Supabase.
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 font-mono text-[10px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  <span>LIVE DATABASE CONTROL</span>
-                </div>
-              </div>
 
-              {cloudSaveMessage && (
-                <div className={`p-3 rounded-xl border text-xs font-mono flex items-center justify-between animate-fadeIn ${
-                  cloudSaveMessage.includes('Error') 
-                    ? 'bg-rose-50 border-rose-200 text-rose-700' 
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                }`}>
-                  <span>{cloudSaveMessage}</span>
-                  <button type="button" onClick={() => setCloudSaveMessage(null)} className="font-bold">
-                    <span className="material-icons text-xs">close</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Master Global Controls */}
-              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <span className="material-icons text-sm text-blue-600">tune</span>
-                  Master Controls & Subscriber Protection
-                </span>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Master Ads Switch */}
-                  <div className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl">
-                    <div className="space-y-0.5 pr-2">
-                      <span className="text-xs font-bold text-slate-800 block">Master In-App Ads Switch</span>
-                      <span className="text-[10px] text-slate-400 block">Turn off to completely disable all ads across the app.</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_master_switch: prev.ads_master_switch === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_master_switch === 'true' ? 'bg-amber-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_master_switch === 'true' ? 'translate-x-5' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-
-                  {/* Pro User 100% Ad-Free Filter */}
-                  <div className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl">
-                    <div className="space-y-0.5 pr-2">
-                      <span className="text-xs font-bold text-slate-800 block">Pro Subscribers 100% Ad-Free</span>
-                      <span className="text-[10px] text-slate-400 block">Ensure active premium subscribers never see any ads.</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_non_pro_only: prev.ads_non_pro_only === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_non_pro_only === 'true' ? 'bg-emerald-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_non_pro_only === 'true' ? 'translate-x-5' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Banner Ads Placement */}
-              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                    <span className="material-icons text-sm text-cyan-600">view_stream</span>
-                    Standard Banner Ads (Alerts & History Screen)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">Banner Enabled</span>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_banner_enabled: prev.ads_banner_enabled === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_banner_enabled === 'true' ? 'bg-cyan-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_banner_enabled === 'true' ? 'translate-x-4' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                    Banner Ad Unit ID
-                  </label>
-                  <input
-                    type="text"
-                    value={remoteConfigs.admob_banner_unit_id || ''}
-                    onChange={(e) => setRemoteConfigs(prev => ({ ...prev, admob_banner_unit_id: e.target.value }))}
-                    placeholder="ca-app-pub-3940256099942544/6300978111"
-                    className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-                  <span className="text-[10px] text-slate-400">Official AdMob Banner ID. Default is Google test unit ID.</span>
-                </div>
-              </div>
-
-              {/* Directory In-Feed Card Ads (Thana, Hospital, Fire, Blood Bank) */}
-              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                    <span className="material-icons text-sm text-blue-600">view_stream</span>
-                    Directory In-Feed Card Ads (Police, Hospital, Fire, Blood)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">In-Feed Enabled</span>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_directory_card_enabled: prev.ads_directory_card_enabled === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_directory_card_enabled === 'true' ? 'bg-blue-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_directory_card_enabled === 'true' ? 'translate-x-4' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                    Card Frequency (Show ad after every X directory items)
-                  </label>
-                  <input
-                    type="number"
-                    min="2"
-                    max="20"
-                    value={remoteConfigs.ads_directory_card_interval || '4'}
-                    onChange={(e) => setRemoteConfigs(prev => ({ ...prev, ads_directory_card_interval: e.target.value }))}
-                    placeholder="4"
-                    className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-                  <span className="text-[10px] text-slate-400">Controls how often an ad card is inserted in directory lists (e.g. 4 means 1 ad after every 4 police/hospital cards).</span>
-                </div>
-              </div>
-
-              {/* History Screen Trip In-Feed Ads */}
-              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                    <span className="material-icons text-sm text-emerald-600">history_edu</span>
-                    History Screen In-Feed Ads (Between Trip Cards)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">History In-Feed Enabled</span>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_history_card_enabled: prev.ads_history_card_enabled === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_history_card_enabled === 'true' ? 'bg-emerald-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_history_card_enabled === 'true' ? 'translate-x-4' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                      Trip Frequency (Every X Trips)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="15"
-                      value={remoteConfigs.ads_history_card_interval || '3'}
-                      onChange={(e) => setRemoteConfigs(prev => ({ ...prev, ads_history_card_interval: e.target.value }))}
-                      placeholder="3"
-                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                    />
-                    <span className="text-[10px] text-slate-400">Show an ad card after every X completed trip cards.</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                      Ad Card Size
-                    </label>
-                    <select
-                      value={remoteConfigs.ads_history_card_size || 'medium_rectangle'}
-                      onChange={(e) => setRemoteConfigs(prev => ({ ...prev, ads_history_card_size: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                    >
-                      <option value="medium_rectangle">Medium Rectangle (300x250) - Large Card</option>
-                      <option value="large_banner">Large Banner (320x100) - Medium Card</option>
-                      <option value="banner">Standard Banner (320x50) - Compact Card</option>
-                    </select>
-                    <span className="text-[10px] text-slate-400">Medium Rectangle is optimal for spacious trip history lists.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Alerts & Live Watch Screen In-Feed Ads */}
-              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                    <span className="material-icons text-sm text-cyan-600">visibility</span>
-                    Alerts & Live Watch Screen Ads (Live Watch & History Tabs)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">Live Watch In-Feed Enabled</span>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_alert_card_enabled: prev.ads_alert_card_enabled === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_alert_card_enabled === 'true' ? 'bg-cyan-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_alert_card_enabled === 'true' ? 'translate-x-4' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                      Share Item Frequency (Every X Items)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="15"
-                      value={remoteConfigs.ads_alert_card_interval || '3'}
-                      onChange={(e) => setRemoteConfigs(prev => ({ ...prev, ads_alert_card_interval: e.target.value }))}
-                      placeholder="3"
-                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
-                    />
-                    <span className="text-[10px] text-slate-400">Show an ad card after every X shared journey cards.</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                      Banner / Card Size
-                    </label>
-                    <select
-                      value={remoteConfigs.ads_alert_card_size || 'large_banner'}
-                      onChange={(e) => setRemoteConfigs(prev => ({ ...prev, ads_alert_card_size: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
-                    >
-                      <option value="large_banner">Large Banner (320x100) - Medium Card</option>
-                      <option value="medium_rectangle">Medium Rectangle (300x250) - Large Card</option>
-                      <option value="banner">Standard Banner (320x50) - Compact Card</option>
-                    </select>
-                    <span className="text-[10px] text-slate-400">Controls banner dimensions in Live Watch and Shared History feeds.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Rewarded Video Ads */}
-              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                    <span className="material-icons text-sm text-emerald-600">smart_display</span>
-                    Rewarded Video Ads (Wallet & Free SOS Credits)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">Rewarded Enabled</span>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_rewarded_enabled: prev.ads_rewarded_enabled === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_rewarded_enabled === 'true' ? 'bg-emerald-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_rewarded_enabled === 'true' ? 'translate-x-4' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                      Rewarded Ad Unit ID
-                    </label>
-                    <input
-                      type="text"
-                      value={remoteConfigs.admob_rewarded_unit_id || ''}
-                      onChange={(e) => setRemoteConfigs(prev => ({ ...prev, admob_rewarded_unit_id: e.target.value }))}
-                      placeholder="ca-app-pub-3940256099942544/5224354917"
-                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                    <span className="text-[10px] text-slate-400">Users willingly watch video to earn emergency SOS credits.</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                      SOS Credits Awarded
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={remoteConfigs.ads_reward_credits_amount || '1'}
-                      onChange={(e) => setRemoteConfigs(prev => ({ ...prev, ads_reward_credits_amount: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                    <span className="text-[10px] text-slate-400">Credits added per completed video.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Interstitial Ads (Trip End Only) */}
-              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                    <span className="material-icons text-sm text-purple-600">fullscreen</span>
-                    Interstitial Ads (Safe Trip Finish Only)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">Interstitial Enabled</span>
-                    <button
-                      type="button"
-                      onClick={() => setRemoteConfigs(prev => ({
-                        ...prev,
-                        ads_interstitial_enabled: prev.ads_interstitial_enabled === 'true' ? 'false' : 'true'
-                      }))}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        remoteConfigs.ads_interstitial_enabled === 'true' ? 'bg-purple-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        remoteConfigs.ads_interstitial_enabled === 'true' ? 'translate-x-4' : 'translate-x-0'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-mono uppercase text-slate-500 font-bold block">
-                    Interstitial Ad Unit ID
-                  </label>
-                  <input
-                    type="text"
-                    value={remoteConfigs.admob_interstitial_unit_id || ''}
-                    onChange={(e) => setRemoteConfigs(prev => ({ ...prev, admob_interstitial_unit_id: e.target.value }))}
-                    placeholder="ca-app-pub-3940256099942544/1033173712"
-                    className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-                  <div className="flex items-center gap-1.5 text-[10px] text-amber-700 bg-amber-50/80 p-2 rounded-lg border border-amber-200/80 mt-1">
-                    <span className="material-icons text-xs">shield</span>
-                    <span>Safety Policy: Interstitial ads are strictly blocked during active journey tracking, emergency SOS, and nearby police/hospital directory searches.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Save Button for AdMob Configuration */}
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={handleSaveRemoteConfigs}
-                  disabled={isSavingCloud}
-                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-mono text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-amber-600/20 cursor-pointer"
-                >
-                  <span className="material-icons text-sm">{isSavingCloud ? 'sync' : 'check'}</span>
-                  <span>{isSavingCloud ? 'Saving to Supabase...' : 'Save AdMob Configuration'}</span>
-                </button>
-              </div>
-
-            </div>
-          )}
 
           {/* TAB 7: APP VERSION LOGS */}
           {activeSubTab === 'versions' && (

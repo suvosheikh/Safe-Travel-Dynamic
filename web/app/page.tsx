@@ -125,7 +125,7 @@ export default function LandingPage() {
             </div>
             <div className="bg-slate-900 border border-slate-800 p-5 md:p-6 rounded-2xl">
               <h4 className="text-base md:text-lg font-bold text-white mb-2">{t('Will this drain my battery?', 'এটি কি প্রচুর ব্যাটারি খরচ করবে?')}</h4>
-              <p className="text-slate-400 text-xs md:text-sm leading-relaxed">{t('SafeTravel uses a highly optimized location engine. It only uses intensive GPS when an active SOS or high-priority trip is running. Otherwise, it relies on low-power cell-tower triangulation.', 'সেফট্রেভেল অত্যাধুনিক অপ্টিমাইজড ইঞ্জিন ব্যবহার করে। কেবল ইমার্জেন্সিতে এটি ফুল জিপিএস ব্যবহার করে, অন্যথায় এটি লো-পাওয়ার লোকেশন ব্যবহার করে।')}</p>
+              <p className="text-slate-400 text-xs md:text-sm leading-relaxed">{t('SafeTravel is designed to be gentle on your battery. It updates your GPS location intelligently during active trips and conserves power whenever your device is stationary.', 'সেফট্রেভেল অত্যন্ত কম ব্যাটারি খরচে কাজ করার জন্য অপ্টিমাইজ করা। ভ্রমণের সময় এটি স্মার্টভাবে লোকেশন আপডেট করে এবং বিশ্রামকালীন সময়ে ব্যাটারি সেভ করে।')}</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 p-5 md:p-6 rounded-2xl">
               <h4 className="text-base md:text-lg font-bold text-white mb-2">{t('Is my location data secure?', 'আমার ডেটা কি নিরাপদ?')}</h4>

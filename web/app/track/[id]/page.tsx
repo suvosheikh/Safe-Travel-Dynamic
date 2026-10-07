@@ -432,7 +432,7 @@ export default function GuardianTrackingPage() {
             <span className="material-icons text-2xl">warning</span> EMERGENCY ALERT
           </h2>
           <p className="text-red-100 font-medium text-xs">
-            {displayProfile.full_name} has triggered an S.O.S alarm. Authorities and local dispatchers have been notified. Please try contacting them immediately.
+            {displayProfile.full_name} has triggered an S.O.S alert. Guardians and emergency contacts have been notified. Please try contacting them immediately.
           </p>
         </div>
       )}

@@ -17,21 +17,21 @@ export default function CoreFeaturesSection() {
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-950/40 border border-cyan-500/30 mb-4 backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]"></span>
             <span className="text-[10px] md:text-xs font-mono text-cyan-300 tracking-wider uppercase font-bold">
-              {t('[INTELLIGENT TRANSIT DEFENSE]', '[উন্নত ট্রানজিট নিরাপত্তা ও এভিডেন্স ভল্ট]')}
+              {t('SMART TRAVEL SAFETY FEATURES', 'স্মার্ট ভ্রমণ সুরক্ষা')}
             </span>
           </div>
 
           <h2 className="text-3xl sm:text-4xl md:text-5.5xl font-black text-white tracking-tight mb-4 md:mb-6">
-            {t('Engineered for uncompromising', 'নিরাপত্তার ক্ষেত্রে')} <br className="hidden sm:block"/>
+            {t('Designed to keep you and your loved ones', 'আপনার প্রতিটি যাত্রায়')} <br className="hidden sm:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500">
-              {t('passenger safety & evidence.', 'কোনো ধরনের আপস নয়।')}
+              {t('safe during every trip.', 'সর্বোচ্চ নিরাপত্তা ও সুরক্ষার নিশ্চয়তা।')}
             </span>
           </h2>
 
           <p className="text-slate-300 max-w-2xl mx-auto text-sm sm:text-base md:text-lg leading-relaxed font-normal">
             {t(
-              'We combined real hardware GPS telemetry with cloud photographic verification, background voice blackbox recording, and 2-second emergency protocols to protect every journey.',
-              'রিয়েল হার্ডওয়্যার জিপিএস, ক্লাউড ক্যামেরা ভেরিফিকেশন, ব্যাকগ্রাউন্ড অডিও ব্ল্যাকবক্স এবং ২-সেকেন্ডের স্মার্ট এসওএস প্রটোকলের সমন্বয়ে নিশ্চিত হয় আপনার প্রতিটি যাত্রার পূর্ণ সুরক্ষা।'
+              'We combine real-time GPS tracking with vehicle photo capture, emergency background audio recording, and fast 2-second SOS alerts to protect every journey.',
+              'রিয়েল-টাইম জিপিএস ট্র্যাকিং, গাড়ির ছবি সংরক্ষণ, ব্যাকগ্রাউন্ড জরুরি অডিও রেকর্ডিং এবং ২-সেকেন্ডের দ্রুত এসওএস সতর্কবার্তার সমন্বয়ে নিশ্চিত হয় আপনার প্রতিটি যাত্রার পূর্ণ সুরক্ষা।'
             )}
           </p>
         </div>
@@ -53,17 +53,17 @@ export default function CoreFeaturesSection() {
                   <span className="material-icons text-2xl">photo_camera</span>
                 </div>
                 <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  CLOUDINARY EVIDENCE ARCHIVE
+                  SECURE PHOTO STORAGE
                 </span>
               </div>
 
               <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">
-                {t('Vehicle Verification & Plate Vault', 'ভেহিকেল ফটো ও লাইসেন্স প্লেট ভল্ট')}
+                {t('Vehicle & Driver Details', 'ভেহিকেল ফটো ও লাইসেন্স প্লেট সংরক্ষণ')}
               </h3>
 
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-6 font-normal">
                 {t(
-                  'Board any CNG auto-rickshaw, taxi, or bus with absolute confidence. Take a quick snapshot of the vehicle license plate before starting; it is immediately locked into an encrypted cloud evidence vault, visible to your guardians even if your phone is lost or stolen.',
+                  'Board any CNG auto-rickshaw, taxi, or bus with absolute confidence. Take a quick snapshot of the vehicle license plate before starting; it is immediately saved to secure cloud storage, visible to your family even if your phone is lost or stolen.',
                   'যেকোনো সিএনজি, ট্যাক্সি বা বাসে ওঠার আগে গাড়ির লাইসেন্স প্লেটের ছবি তুলুন। ছবি তোলার সাথে সাথেই তা ক্লাউডে সংরক্ষিত হয়ে যায় এবং পরিবারের ট্র্যাকিং স্ক্রিনে লাইভ যুক্ত হয়—যাতে ফোন হারিয়ে গেলেও প্রমাণ অক্ষত থাকে।'
                 )}
               </p>
@@ -74,7 +74,7 @@ export default function CoreFeaturesSection() {
               <div className="flex items-center justify-between mb-3 text-[11px] font-mono">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-slate-300 font-bold uppercase">{t('BOARDING SNAPSHOT VERIFIED', 'গাড়ির ছবি ভেরিফাইড')}</span>
+                  <span className="text-slate-300 font-bold uppercase">{t('VEHICLE PHOTO SAVED', 'গাড়ির ছবি সংরক্ষিত')}</span>
                 </div>
                 <span className="text-cyan-400 font-semibold">AES-256 ENCRYPTED</span>
               </div>
@@ -108,7 +108,7 @@ export default function CoreFeaturesSection() {
 
                   <div className="pt-1 border-t border-slate-800 text-[10px] text-emerald-400 font-mono flex items-center gap-1">
                     <span className="material-icons text-xs">verified</span>
-                    <span>{t('Archived for Forensic Verification', 'ফরেনসিক প্রমাণের জন্য ক্লাউডে সংরক্ষিত')}</span>
+                    <span>{t('Saved securely for safety verification', 'নিরাপত্তার স্বার্থে সুরক্ষিতভাবে সংরক্ষিত')}</span>
                   </div>
                 </div>
               </div>
@@ -116,7 +116,7 @@ export default function CoreFeaturesSection() {
           </div>
 
           {/* ========================================================
-              BENTO 2: AUTOMATED AUDIO BLACKBOX RECORDING (Cols: 5)
+              BENTO 2: AUTOMATED AUDIO RECORDING (Cols: 5)
              ======================================================== */}
           <div className="md:col-span-5 bg-gradient-to-br from-amber-950/20 via-slate-900/90 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 relative overflow-hidden group hover:border-amber-500/50 transition-all flex flex-col justify-between shadow-2xl">
             {/* Ambient Background Glow */}
@@ -129,17 +129,17 @@ export default function CoreFeaturesSection() {
                   <span className="material-icons text-2xl">graphic_eq</span>
                 </div>
                 <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  FORENSIC VOICE BLACKBOX
+                  EMERGENCY VOICE RECORDING
                 </span>
               </div>
 
               <h3 className="text-2xl font-extrabold text-white mb-3">
-                {t('Cloud Audio Blackbox', 'ক্লাউড অডিও ব্ল্যাকবক্স')}
+                {t('Emergency Audio Recording', 'জরুরি অডিও রেকর্ডিং')}
               </h3>
 
               <p className="text-slate-300 text-sm leading-relaxed mb-6 font-normal">
                 {t(
-                  'During safety protocols or active panic triggers, SafeTravel automatically initiates high-fidelity ambient voice recording in the background. The audio stream is securely uploaded to Cloudinary so dispatchers and family hear critical in-cabin context.',
+                  'During an emergency or SOS alert, SafeTravel automatically records background audio and uploads it securely so your family can hear what is happening.',
                   'বিপদের সময় বা জরুরি এসওএস ট্রিগার হলে ব্যাকগ্রাউন্ডে স্বয়ংক্রিয়ভাবে অডিও রেকর্ড শুরু হয়। এই ভয়েস ক্লিপ সরাসরি ক্লাউডে সেভ হয়, ফলে অভিভাবক ও জরুরি রেসপন্ডাররা গাড়ির ভেতরের পরিস্থিতি স্পষ্ট শুনতে পান।'
                 )}
               </p>
@@ -150,7 +150,7 @@ export default function CoreFeaturesSection() {
               <div className="flex items-center justify-between text-[10px] font-mono text-amber-400">
                 <span className="flex items-center gap-1 font-bold">
                   <span className="material-icons text-xs">volume_up</span>
-                  <span>EVIDENCE STREAM</span>
+                  <span>AUDIO CLIP</span>
                 </span>
                 <span className="text-slate-400">DURATION: 00:15 &bull; 245 KB</span>
               </div>
@@ -173,14 +173,14 @@ export default function CoreFeaturesSection() {
               </div>
 
               <div className="flex justify-between items-center text-[9px] font-mono text-slate-400 pt-0.5">
-                <span>[TRIGGER: SOS EMERGENCY]</span>
-                <span className="text-emerald-400 font-bold">TAMPER-PROOF SECURE</span>
+                <span>[EMERGENCY SOS ALERT]</span>
+                <span className="text-emerald-400 font-bold">SAVED SECURELY</span>
               </div>
             </div>
           </div>
 
           {/* ========================================================
-              BENTO 3: 2-SECOND SMART SOS & WHATSAPP DISPATCH (Cols: 5)
+              BENTO 3: 2-SECOND SMART SOS & WHATSAPP ALERT (Cols: 5)
              ======================================================== */}
           <div className="md:col-span-5 bg-gradient-to-br from-rose-950/20 via-slate-900/90 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 relative overflow-hidden group hover:border-rose-500/50 transition-all flex flex-col justify-between shadow-2xl">
             {/* Ambient Background Glow */}
@@ -193,7 +193,7 @@ export default function CoreFeaturesSection() {
                   <span className="material-icons text-2xl">emergency</span>
                 </div>
                 <span className="text-[10px] font-mono font-bold text-rose-400 bg-rose-950/60 border border-rose-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  2-STAGE PANIC PROTOCOL
+                  EMERGENCY SOS ALERT
                 </span>
               </div>
 
@@ -232,19 +232,19 @@ export default function CoreFeaturesSection() {
                 <div className="flex items-center justify-between text-[10px] font-mono text-emerald-400">
                   <span className="font-bold flex items-center gap-1">
                     <span className="material-icons text-xs">chat</span>
-                    AUTO WHATSAPP DISPATCH
+                    AUTO WHATSAPP ALERT
                   </span>
                   <span>DELIVERED (2/2)</span>
                 </div>
                 <p className="text-[11px] text-slate-300 font-sans leading-tight">
-                  "{t('EMERGENCY SOS: I triggered panic protocol near Kazipara. Watch live: safetravel.app/track/TRK-9X4', 'জরুরি অ্যালার্ট: আমি কাজীপাড়ায় বিপদে পড়েছি। লাইভ দেখুন: safetravel.app/track/TRK-9X4')}"
+                  "{t('EMERGENCY SOS: I need help near Kazipara. Watch live: safetravel.app/track/TRK-9X4', 'জরুরি অ্যালার্ট: আমি কাজীপাড়ায় বিপদে পড়েছি। লাইভ দেখুন: safetravel.app/track/TRK-9X4')}"
                 </p>
               </div>
             </div>
           </div>
 
           {/* ========================================================
-              BENTO 4: ZERO-INSTALL GUARDIAN RADAR & TELEMETRY (Cols: 7)
+              BENTO 4: ZERO-INSTALL GUARDIAN TRACKING (Cols: 7)
              ======================================================== */}
           <div className="md:col-span-7 bg-gradient-to-br from-slate-900/90 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 relative overflow-hidden group hover:border-emerald-500/50 transition-all flex flex-col justify-between shadow-2xl">
             {/* Ambient Background Glow */}
@@ -257,18 +257,18 @@ export default function CoreFeaturesSection() {
                   <span className="material-icons text-2xl">radar</span>
                 </div>
                 <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  ZERO-INSTALL GUARDIAN PORTAL
+                  LIVE GUARDIAN PORTAL
                 </span>
               </div>
 
               <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">
-                {t('Zero-Install Guardian Radar & Telemetry', 'জিরো-ইনস্টল গার্ডিয়ান রাডার ও টেলিমেট্রি')}
+                {t('Live Location & Status Sharing', 'পরিবারের জন্য সরাসরি লাইভ ট্র্যাকিং')}
               </h3>
 
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-6 font-normal">
                 {t(
-                  'Your parents, spouses, and friends do NOT need to download or register on any app. When you start a trip, they receive an encrypted private web link. Clicking it opens a 60FPS live tracking HUD showing real-time GPS coordinates, vehicle photo, speed, and phone battery percentage.',
-                  'আপনার বাবা-মা, ভাই-বোন বা বন্ধুদের ফোনে কোনো অ্যাপ ইনস্টল করতে হবে না। ট্রিপ শুরুর সাথে সাথে তারা একটি সিকিউর ওয়েব লিংক পাবেন। যেকোনো ব্রাউজারেই ৬0fps স্মুথ ম্যাপে গাড়ির লাইভ লোকেশন, গতি, গাড়ির ছবি এবং ফোনের ব্যাটারির চার্জ সরাসরি দেখা যাবে।'
+                  'Your parents, spouses, and friends do NOT need to download or register on any app. When you start a trip, they receive an encrypted private web link. Clicking it opens a live tracking view showing real-time GPS coordinates, vehicle photo, speed, and phone battery percentage.',
+                  'আপনার বাবা-মা, ভাই-বোন বা বন্ধুদের ফোনে কোনো অ্যাপ ইনস্টল করতে হবে না। ট্রিপ শুরুর সাথে সাথে তারা একটি সিকিউর ওয়েব লিংক পাবেন। যেকোনো ব্রাউজারেই স্মুথ ম্যাপে গাড়ির লাইভ লোকেশন, গতি, গাড়ির ছবি এবং ফোনের ব্যাটারির চার্জ সরাসরি দেখা যাবে।'
                 )}
               </p>
             </div>
@@ -278,7 +278,7 @@ export default function CoreFeaturesSection() {
               <div className="flex items-center justify-between text-xs font-mono">
                 <div className="flex items-center gap-2">
                   <span className="material-icons text-emerald-400 text-sm">open_in_browser</span>
-                  <span className="text-slate-300 font-bold uppercase">BROWSER LIVE HUD &bull; 0ms WEBSOCKET</span>
+                  <span className="text-slate-300 font-bold uppercase">LIVE WEB TRACKING</span>
                 </div>
                 <span className="text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
                   60 FPS REALTIME
@@ -288,18 +288,18 @@ export default function CoreFeaturesSection() {
               {/* 3 Telemetry Metrics */}
               <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
                 <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block">{t('SPEED PROFILE', 'লাইভ স্পিড')}</span>
+                  <span className="text-[9px] text-slate-500 uppercase block">{t('CURRENT SPEED', 'লাইভ গতি')}</span>
                   <span className="font-bold text-white text-sm">34 km/h</span>
                 </div>
 
                 <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block">{t('BATTERY DRAIN', 'ব্যাটারি চার্জ')}</span>
+                  <span className="text-[9px] text-slate-500 uppercase block">{t('PHONE BATTERY', 'ব্যাটারি চার্জ')}</span>
                   <span className="font-bold text-emerald-400 text-sm">86% Normal</span>
                 </div>
 
                 <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block">{t('DEVIATION GUARD', 'রুট ডেভিয়েশন')}</span>
-                  <span className="font-bold text-cyan-400 text-sm">0 Off-Path</span>
+                  <span className="text-[9px] text-slate-500 uppercase block">{t('ROUTE STATUS', 'রুট স্ট্যাটাস')}</span>
+                  <span className="font-bold text-cyan-400 text-sm">On Path</span>
                 </div>
               </div>
 

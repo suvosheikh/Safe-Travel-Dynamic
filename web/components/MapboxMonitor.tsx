@@ -483,6 +483,56 @@ export default function MapboxMonitor({
     return roadGeometries[key] || generateSimulatedRoadRoute(startCoords, endCoords);
   };
 
+  // Helper to compute overall heading for a trip (travel direction facing upwards)
+  const getTripOverallHeading = (trip: Trip): number => {
+    // 1. Check genuine traveled GPS log
+    const traveledLog = extractRouteLog(trip.route_path_log);
+    if (traveledLog && traveledLog.length >= 2) {
+      const pStart = traveledLog[0];
+      const pEnd = traveledLog[traveledLog.length - 1];
+      const dist = getCoordDistanceMeters(pStart, pEnd);
+      if (dist > 30) {
+        return calculateSimpleHeading(pStart, pEnd);
+      }
+      // If round trip or start and end are close, find point furthest from start
+      let maxDist = 0;
+      let furthestPt = traveledLog[1];
+      for (const pt of traveledLog) {
+        const d = getCoordDistanceMeters(pStart, pt);
+        if (d > maxDist) {
+          maxDist = d;
+          furthestPt = pt;
+        }
+      }
+      if (maxDist > 30) {
+        return calculateSimpleHeading(pStart, furthestPt);
+      }
+    }
+
+    // 2. Check planned route log
+    const plannedLog = extractRouteLog(trip.planned_route_log);
+    if (plannedLog && plannedLog.length >= 2) {
+      const pStart = plannedLog[0];
+      const pEnd = plannedLog[plannedLog.length - 1];
+      const dist = getCoordDistanceMeters(pStart, pEnd);
+      if (dist > 30) {
+        return calculateSimpleHeading(pStart, pEnd);
+      }
+    }
+
+    // 3. Check start and end locations/coordinates
+    const start = trip.start_coords || getCoordsSync(trip.start_location, resolvedCoords);
+    const end = trip.end_coords || getCoordsSync(trip.end_location, resolvedCoords);
+    if (start && end) {
+      const dist = getCoordDistanceMeters(start, end);
+      if (dist > 30) {
+        return calculateSimpleHeading(start, end);
+      }
+    }
+
+    return 0;
+  };
+
   // 1. Generate interpolated guidance route whenever active selected trip changes (Manual preview only)
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -518,6 +568,8 @@ export default function MapboxMonitor({
   const animationRef = useRef<number>(undefined);
   const currentDistRef = useRef<number>(0);
   const currentHeadingRef = useRef<number>(0);
+  const isNorthUpRef = useRef<boolean>(false);
+  const currentTripHeadingRef = useRef<number>(0);
 
   const lerpAngle = (current: number, target: number, amount: number): number => {
     let diff = (target - current) % 360;
@@ -526,10 +578,11 @@ export default function MapboxMonitor({
     return (current + diff * amount + 360) % 360;
   };
 
-  // Reset simulation state when switching trips
+  // Reset simulation state and default to Heading-Up when switching trips
   useEffect(() => {
     setIsSimFinished(false);
     currentDistRef.current = 0;
+    isNorthUpRef.current = false;
   }, [selectedTripId]);
 
   // Live GPS Speedometer calculation when not in simulation
@@ -706,7 +759,10 @@ export default function MapboxMonitor({
         if (el) {
           const rotationEl = el.querySelector('.puck-rotation') as HTMLElement;
           if (rotationEl) {
-            rotationEl.style.transform = `rotate(${currentHeadingRef.current}deg)`;
+            (rotationEl as any)._heading = currentHeadingRef.current;
+            const b = mapRef.current ? mapRef.current.getBearing() : 0;
+            const screenAngle = (currentHeadingRef.current - b + 360) % 360;
+            rotationEl.style.transform = `rotate(${screenAngle}deg)`;
           }
           // Update live progress time badge beside traveler point
           const timeTextEl = el.querySelector('.puck-time-text') as HTMLElement;
@@ -880,8 +936,64 @@ export default function MapboxMonitor({
         }
       });
 
-      // Add navigation controls (zoom, compass)
-      mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      // Add navigation controls (zoom, compass with pitch visualization)
+      const navControl = new mapboxgl.NavigationControl({ visualizePitch: true });
+      mapInstance.addControl(navControl, 'top-right');
+
+      // Wire compass click to toggle between Heading-Up (travel direction UP) and North-Up
+      setTimeout(() => {
+        const compassBtn = mapContainerRef.current?.querySelector('.mapboxgl-ctrl-compass') as HTMLButtonElement | null;
+        if (compassBtn) {
+          compassBtn.title = 'Reset to North Up';
+          const onCompassClick = (e: MouseEvent) => {
+            if (!mapRef.current) return;
+            const currentBearing = mapRef.current.getBearing();
+            if (Math.abs(currentBearing) < 4) {
+              // Already facing North: Switch back to Heading-Up
+              e.preventDefault();
+              e.stopPropagation();
+              isNorthUpRef.current = false;
+              const targetHeading = currentTripHeadingRef.current || 0;
+              mapRef.current.easeTo({
+                bearing: targetHeading,
+                pitch: targetHeading !== 0 ? 35 : 0,
+                duration: 900
+              });
+            } else {
+              // Heading-Up is active: Switch to North-Up
+              e.preventDefault();
+              e.stopPropagation();
+              isNorthUpRef.current = true;
+              mapRef.current.easeTo({
+                bearing: 0,
+                pitch: 0,
+                duration: 900
+              });
+            }
+          };
+          compassBtn.addEventListener('click', onCompassClick, true);
+        }
+      }, 100);
+
+      // Rotate listener to update compass button tooltip and marker orientations smoothly
+      mapInstance.on('rotate', () => {
+        const b = mapInstance.getBearing();
+        const compassBtn = mapContainerRef.current?.querySelector('.mapboxgl-ctrl-compass') as HTMLButtonElement | null;
+        if (compassBtn) {
+          compassBtn.title = Math.abs(b) < 4 ? 'Orient Heading Up (Travel Direction)' : 'Reset to North Up';
+        }
+        Object.values(markersRef.current).forEach((m: any) => {
+          try {
+            const el = m.getElement();
+            const rotEl = el?.querySelector('.puck-rotation') as HTMLElement;
+            if (rotEl && (rotEl as any)._heading !== undefined) {
+              const angle = ((rotEl as any)._heading - b + 360) % 360;
+              rotEl.style.transform = `rotate(${angle}deg)`;
+            }
+          } catch {}
+        });
+      });
+
       mapRef.current = mapInstance;
       setTimeout(() => {
         setMapLoadedTrigger(prev => prev + 1);
@@ -1311,13 +1423,16 @@ export default function MapboxMonitor({
         if (markersRef.current[trip.id]) {
           const m = markersRef.current[trip.id];
           try {
-            if (!isManualSim) {
+            if (!isSimulating) {
               m.setLngLat(coords);
               const el = m.getElement();
               if (el) {
                 const rotationEl = el.querySelector('.puck-rotation') as HTMLElement;
                 if (rotationEl) {
-                  rotationEl.style.transform = `rotate(${heading}deg)`;
+                  (rotationEl as any)._heading = heading;
+                  const b = mapRef.current ? mapRef.current.getBearing() : 0;
+                  const screenAngle = (heading - b + 360) % 360;
+                  rotationEl.style.transform = `rotate(${screenAngle}deg)`;
                 }
               }
             }
@@ -1354,16 +1469,22 @@ export default function MapboxMonitor({
             el.className = isSOS ? 'mapbox-sos-marker' : 'mapbox-custom-marker';
             if (isSelected) el.classList.add('selected-pulse');
 
+            const b = mapRef.current ? mapRef.current.getBearing() : 0;
+            const screenAngle = (heading - b + 360) % 360;
             const puckInner = document.createElement('div');
             puckInner.className = `gps-navigation-puck ${isSelected ? '' : 'mini'} ${isSOS ? 'sos-alarm' : ''}`;
             puckInner.innerHTML = `
               <div class="puck-pulse-ring ${isSOS ? 'puck-sos' : isSelected ? 'puck-selected' : ''}"></div>
               <div class="puck-core ${isSOS ? 'sos' : isSelected ? 'selected' : ''}">
-                <div class="puck-rotation" style="transform: rotate(${heading}deg)">
+                <div class="puck-rotation" style="transform: rotate(${screenAngle}deg)">
                   <div class="puck-arrow-delta"></div>
                 </div>
               </div>
             `;
+            const rotEl = puckInner.querySelector('.puck-rotation');
+            if (rotEl) {
+              (rotEl as any)._heading = heading;
+            }
             el.appendChild(puckInner);
 
             // Flat visible progress time pill (always displayed, no hover required)
@@ -1440,6 +1561,11 @@ export default function MapboxMonitor({
 
     if (!bounds.isEmpty()) {
       try {
+        const tripHeading = getTripOverallHeading(trip);
+        currentTripHeadingRef.current = tripHeading;
+        const targetBearing = isNorthUpRef.current ? 0 : tripHeading;
+        const targetPitch = (isNorthUpRef.current || tripHeading === 0) ? 0 : 35;
+
         mapRef.current.fitBounds(bounds, {
           padding: { 
             top: isModalMode ? 40 : 90, 
@@ -1447,6 +1573,8 @@ export default function MapboxMonitor({
             left: isModalMode ? 40 : 80, 
             right: isModalMode ? 40 : 80 
           },
+          bearing: targetBearing,
+          pitch: targetPitch,
           maxZoom: 16,
           duration: smooth ? 1200 : 0
         });
@@ -1467,7 +1595,7 @@ export default function MapboxMonitor({
     lastFittedTripKeyRef.current = fitKey;
 
     fitMapToTrip(trip);
-  }, [selectedTripId, activeTripsList, resolvedCoords]);
+  }, [selectedTripId, activeTripsList, resolvedCoords, mapLoadedTrigger]);
 
   // 3.4 Geocode custom addresses
   useEffect(() => {
@@ -2435,11 +2563,11 @@ export default function MapboxMonitor({
           <div className="absolute bottom-3 left-3 right-3 p-3 bg-slate-900/95 border border-slate-800 rounded-lg shadow-xl z-20 flex flex-col justify-between space-y-2 md:flex-row md:space-y-0 md:items-center">
             <div className="flex flex-col">
               <span className="text-slate-300 font-mono text-[10px] uppercase font-bold tracking-wider flex items-center">
-                <span className="material-icons text-blue-400 text-xs mr-1 animate-pulse font-bold">shield</span> 
-                RADAR MONITOR FALLBACK MODE
+                <span className="material-icons text-blue-400 text-xs mr-1 animate-pulse font-bold">map</span> 
+                INTERACTIVE MAP VIEW
               </span>
               <span className="text-slate-500 text-[8.5px] font-mono uppercase mt-0.5">
-                Simulated NY Radar Active &bull; Click indicators to select
+                Map token not configured &bull; Click indicators to select
               </span>
             </div>
 
@@ -2450,8 +2578,8 @@ export default function MapboxMonitor({
                 onClick={() => setShowConfig(true)}
                 className="bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-mono text-[9.5px] px-2.5 py-1 rounded transition-all cursor-pointer flex items-center space-x-1 self-start md:self-auto"
               >
-                <span className="material-icons text-[11px]">map</span>
-                <span>ACTIVATE LIVE MAPBOX MAP</span>
+                <span className="material-icons text-[11px]">vpn_key</span>
+                <span>CONFIGURE MAPBOX TOKEN</span>
               </button>
             ) : (
               <div className="flex flex-col space-y-1.5 bg-slate-950 border border-slate-800 p-2.5 rounded-lg w-full md:max-w-xs transition-all">

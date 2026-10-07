@@ -122,17 +122,17 @@ export default function VehicleVaultSection({
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-800 flex items-center">
             <span className="material-icons text-cyan-600 mr-2 text-2xl">directions_car</span>
-            Vehicle Verification & Plate Vault
+            Vehicle & Driver Records
           </h1>
           <p className="text-slate-500 text-xs mt-0.5">
-            Cloudinary photo evidence archive, license plate registry, and vehicle safety audit logs.
+            Photos, license plates, and driver details recorded before travel.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-2 text-xs font-mono">
             <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
-            <span className="text-slate-500">PHOTO VAULT:</span>
+            <span className="text-slate-500">PHOTOS SAVED:</span>
             <span className="font-bold text-slate-800">{totalWithPhotos} / {vehicleRecords.length} VERIFIED</span>
           </div>
         </div>
@@ -144,7 +144,7 @@ export default function VehicleVaultSection({
         {/* Sub-navigation Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
           {[
-            { id: 'all', label: 'All Fleet', count: vehicleRecords.length, icon: 'all_inclusive' },
+            { id: 'all', label: 'All Vehicles', count: vehicleRecords.length, icon: 'all_inclusive' },
             { id: 'with_photo', label: 'Photo Evidence', count: totalWithPhotos, icon: 'photo_camera' },
             { id: 'car', label: 'Cars & Taxis', icon: 'local_taxi' },
             { id: 'cng', label: 'CNG & Auto', icon: 'electric_rickshaw' },

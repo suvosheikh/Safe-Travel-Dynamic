@@ -159,8 +159,8 @@ export default function SubscriptionPlansSection({ db, setDb, currentUser }: Sub
     setPlanCurrency('BDT');
     setPlanFeatures([
       'Unlimited Safe Trips',
-      'Continuous Cloud Audio Blackbox',
-      'Priority SOS Dispatch Support',
+      'Emergency Cloud Audio Recording',
+      'Priority SOS Emergency Support',
       '2x Safe Trip Reward Points'
     ]);
     setPlanIsActive(true);
@@ -1141,7 +1141,7 @@ export default function SubscriptionPlansSection({ db, setDb, currentUser }: Sub
                 <div className="flex space-x-2">
                   <input
                     type="text"
-                    placeholder="e.g. Priority SOS Dispatch Support"
+                    placeholder="e.g. Priority SOS Emergency Support"
                     value={newFeatureInput}
                     onChange={e => setNewFeatureInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddFeature(); } }}

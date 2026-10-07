@@ -26,6 +26,7 @@ import SosAlertsSection from '../../../../components/sections/SosAlertsSection';
 import VehicleVaultSection from '../../../../components/sections/VehicleVaultSection';
 import AudioBlackboxSection from '../../../../components/sections/AudioBlackboxSection';
 import PromoBannerSection from '../../../../components/sections/PromoBannerSection';
+import AdMonetizationSection from '../../../../components/sections/AdMonetizationSection';
 import SystemSettingsSection from '../../../../components/sections/SystemSettingsSection';
 import SubscriptionPlansSection from '../../../../components/sections/SubscriptionPlansSection';
 import TripDetailsModal from '../../../../components/TripDetailsModal';
@@ -182,85 +183,6 @@ export default function AdminDashboardPage() {
   const [simTransitEnd, setSimTransitEnd] = useState<string>('JFK Airport, Queens, NY');
   const [simBookingSuccess, setSimBookingSuccess] = useState<boolean>(false);
 
-  // Real-time Supabase Homepage Banner Synchronizer
-  React.useEffect(() => {
-    const supabase = getSupabaseClient();
-    if (!supabase || !mounted) return;
-
-    let active = true;
-
-    // 1. Initial Fetch of all banners from Supabase
-    const fetchBanners = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('banners')
-          .select('id, title, image_url, action_url, display_order, start_date, end_date, is_active, created_at')
-          .order('display_order', { ascending: true })
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.warn('Error fetching initial banners from Supabase:', error);
-          return;
-        }
-
-        if (data && active) {
-          const mappedBanners: Banner[] = data.map((b: any) => ({
-            id: String(b.id),
-            title: b.title || 'Unnamed Banner',
-            image_url: b.image_url,
-            action_url: b.action_url,
-            display_order: b.display_order,
-            start_date: b.start_date,
-            end_date: b.end_date,
-            is_active: Boolean(b.is_active),
-            created_at: b.created_at
-          }));
-
-          // Find the active banner (where is_active is true), or fall back to the first one
-          const activeB = mappedBanners.find(b => b.is_active) || mappedBanners[0];
-          const activeUrl = activeB ? activeB.image_url : 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?auto=format&fit=crop&w=1200&h=675&q=80';
-
-          setDb(currentDb => {
-            const updatedDb = { 
-              ...currentDb, 
-              banners: mappedBanners,
-              bannerUrl: activeUrl
-            };
-            saveLocalDatabase(updatedDb);
-            return updatedDb;
-          });
-        }
-      } catch (err) {
-        console.error('Failed to select banners:', err);
-      }
-    };
-
-    fetchBanners();
-
-    // 2. Subscribe to Realtime Postgres changes on 'banners' table
-    const channel = supabase
-      .channel('realtime_banners')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'banners'
-        },
-        async (payload: any) => {
-          if (!active) return;
-          console.log('Realtime banner update payload received:', payload);
-          await fetchBanners();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      active = false;
-      supabase.removeChannel(channel);
-    };
-  }, [mounted]);
-
   // Selected Active Trip for Radar Map Highlight initialized dynamically on load
   const [selectedTripId, setSelectedTripId] = useState<string | null>(() => {
     const localDb = getLocalDatabase();
@@ -268,6 +190,68 @@ export default function AdminDashboardPage() {
     const ongoing = localDb.trips.find(t => t.status === 'ongoing');
     return activeSos ? activeSos.id : (ongoing ? ongoing.id : null);
   });
+
+  // Initialize saved display scale preference on mount
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('safetravel_display_scale') as 'auto' | 'fhd' | '100' | null;
+      if (saved && (saved === 'auto' || saved === 'fhd' || saved === '100')) {
+        document.documentElement.setAttribute('data-display-scale', saved);
+      } else {
+        document.documentElement.setAttribute('data-display-scale', 'auto');
+      }
+    } catch {
+      document.documentElement.setAttribute('data-display-scale', 'auto');
+    }
+  }, []);
+
+  // Real-time Operational Telemetry & Sync States
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'error'>('connecting');
+
+  // Centralized, Resilient Fetcher for Operational Data
+  const fetchOperationalData = React.useCallback(async (silent = false) => {
+    const supabase = getSupabaseClient();
+    if (!supabase || !hasSupabaseConfig()) return;
+
+    if (!silent) setIsSyncing(true);
+    try {
+      const initialData = await fetchInitialData(supabase);
+      if (initialData && Object.keys(initialData).length > 0) {
+        setDb(currentDb => {
+          const mappedBanners = initialData.banners || currentDb.banners;
+          const activeB = mappedBanners.find((b: any) => b.is_active) || mappedBanners[0];
+          const activeUrl = activeB ? activeB.image_url : currentDb.bannerUrl;
+
+          const updatedDb = { 
+            ...currentDb, 
+            ...initialData,
+            banners: mappedBanners,
+            bannerUrl: activeUrl || currentDb.bannerUrl
+          };
+          saveLocalDatabase(updatedDb);
+
+          // Auto-select a trip if none selected
+          if (!selectedTripId) {
+            const activeSos = updatedDb.trips.find(t => t.status === "sos");
+            const ongoing = updatedDb.trips.find(t => t.status === "ongoing");
+            if (activeSos) setSelectedTripId(activeSos.id);
+            else if (ongoing) setSelectedTripId(ongoing.id);
+          }
+
+          return updatedDb;
+        });
+        setLastSyncTime(new Date());
+      }
+    } catch (err) {
+      console.error('[fetchOperationalData] Failed to fetch:', err);
+    } finally {
+      if (!silent) {
+        setTimeout(() => setIsSyncing(false), 350);
+      }
+    }
+  }, [selectedTripId]);
 
   // New Profile Form State
   const [newProfileName, setNewProfileName] = useState('');
@@ -445,7 +429,7 @@ export default function AdminDashboardPage() {
     const currentCredits = targetUser?.trip_credits ?? 0;
 
     if (!isPremium && currentCredits <= 0) {
-      alert("⚠️ Request Rejected: Insufficient trip credit balance! Add safe credits in Traveler Registry, or toggle standard profile as premium.");
+      alert("[WARNING] Request Rejected: Insufficient trip credit balance! Add safe credits in Traveler Registry, or toggle standard profile as premium.");
       return;
     }
 
@@ -486,10 +470,10 @@ export default function AdminDashboardPage() {
   };
 
   const handleSimulatePassengerSOS = () => {
-    // Check if the current passenger has any ongoing transit trips
+    // Check if the current passenger has any ongoing transit rides
     const activeTrip = db.trips.find(t => t.user_id === simulatedUserId && t.status === 'ongoing');
     if (!activeTrip) {
-      alert("⚠️ SOS Locked: There are no active, ongoing transit rides running for this traveler! Request a secure ride in the simulated phone interface first.");
+      alert("[WARNING] SOS Locked: There are no active, ongoing transit rides running for this traveler! Request a secure ride in the simulated phone interface first.");
       return;
     }
 
@@ -513,10 +497,10 @@ export default function AdminDashboardPage() {
       sosRecords: [newSos, ...db.sosRecords]
     });
 
-    alert("🚨 EMERGENCY PANIC SILENT ALARM DISPATCHED! Dispatchers in HQ are instantly loaded with safety beacon and real-time transit telemetry map tracker.");
+    alert("[SOS EMERGENCY] PANIC SILENT ALARM DISPATCHED! Dispatchers in HQ are instantly loaded with safety beacon and real-time transit telemetry map tracker.");
   };
 
-  // Main Real-time Supabase Synchronizer for Telemetry
+  // Main Real-time Supabase Synchronizer for Telemetry & Operations (Self-Healing)
   React.useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase || !mounted) return;
@@ -524,29 +508,9 @@ export default function AdminDashboardPage() {
     let active = true;
 
     // 1. Initial Fetch of all operational data
-    const fetchOperationalData = async () => {
-      const initialData = await fetchInitialData(supabase);
-      if (active && Object.keys(initialData).length > 0) {
-        setDb(currentDb => {
-          const updatedDb = { ...currentDb, ...initialData };
-          saveLocalDatabase(updatedDb);
-          
-          // Auto-select a trip if none selected
-          if (!selectedTripId) {
-             const activeSos = updatedDb.trips.find(t => t.status === "sos");
-             const ongoing = updatedDb.trips.find(t => t.status === "ongoing");
-             if (activeSos) setSelectedTripId(activeSos.id);
-             else if (ongoing) setSelectedTripId(ongoing.id);
-          }
+    fetchOperationalData(false);
 
-          return updatedDb;
-        });
-      }
-    };
-
-    fetchOperationalData();
-
-    // 2. Setup Realtime channels for travel_activities (telemetry) and profiles
+    // 2. Setup Realtime channels for all mission-critical tables
     const channel = supabase
       .channel("dashboard_updates")
       .on(
@@ -601,17 +565,12 @@ export default function AdminDashboardPage() {
               saveLocalDatabase(updatedDb);
               return updatedDb;
             });
+            setLastSyncTime(new Date());
             return;
           }
 
-          // On INSERT or DELETE, perform a fresh query
-          const newData = await fetchInitialData(supabase);
-          if (!active) return;
-          setDb(currentDb => {
-             const updatedDb = { ...currentDb, ...newData };
-             saveLocalDatabase(updatedDb);
-             return updatedDb;
-          });
+          // On INSERT or DELETE, perform a fresh silent query
+          await fetchOperationalData(true);
         }
       )
       .on(
@@ -636,11 +595,10 @@ export default function AdminDashboardPage() {
               saveLocalDatabase(updatedDb);
               return updatedDb;
             });
+            setLastSyncTime(new Date());
             return;
           }
-          const newData = await fetchInitialData(supabase);
-          if (!active) return;
-          setDb(currentDb => ({ ...currentDb, ...newData }));
+          await fetchOperationalData(true);
         }
       )
       .on(
@@ -656,11 +614,10 @@ export default function AdminDashboardPage() {
               saveLocalDatabase(updatedDb);
               return updatedDb;
             });
+            setLastSyncTime(new Date());
             return;
           }
-          const newData = await fetchInitialData(supabase);
-          if (!active) return;
-          setDb(currentDb => ({ ...currentDb, ...newData }));
+          await fetchOperationalData(true);
         }
       )
       .on(
@@ -668,22 +625,92 @@ export default function AdminDashboardPage() {
         { event: "*", schema: "public", table: "guardians" },
         async () => {
           if (!active) return;
-          const newData = await fetchInitialData(supabase);
-          if (!active) return;
-          setDb(currentDb => {
-            const updatedDb = { ...currentDb, ...newData };
-            saveLocalDatabase(updatedDb);
-            return updatedDb;
-          });
+          await fetchOperationalData(true);
         }
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "safety_audio_logs" },
+        async () => {
+          if (!active) return;
+          await fetchOperationalData(true);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_transactions" },
+        async () => {
+          if (!active) return;
+          await fetchOperationalData(true);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "banners" },
+        async () => {
+          if (!active) return;
+          await fetchOperationalData(true);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_remote_configs" },
+        async () => {
+          if (!active) return;
+          await fetchOperationalData(true);
+        }
+      )
+      .subscribe((status, err) => {
+        if (!active) return;
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setRealtimeStatus('error');
+          console.warn(`[Realtime Channel] Status: ${status}`, err);
+        } else {
+          setRealtimeStatus('connecting');
+        }
+      });
+
+    // 3. Tab Visibility, Focus & Network Recovery Listeners (Instant Anti-Stall)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && active) {
+        fetchOperationalData(true);
+      }
+    };
+
+    const handleWindowFocus = () => {
+      if (active) {
+        fetchOperationalData(true);
+      }
+    };
+
+    const handleOnline = () => {
+      if (active) {
+        fetchOperationalData(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('online', handleOnline);
+
+    // 4. Smart Heartbeat (Every 14s when tab is visible to prevent silent desync)
+    const heartbeatTimer = setInterval(() => {
+      if (document.visibilityState === 'visible' && active) {
+        fetchOperationalData(true);
+      }
+    }, 14000);
 
     return () => {
       active = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('online', handleOnline);
+      clearInterval(heartbeatTimer);
       supabase.removeChannel(channel);
     };
-  }, [mounted]);
+  }, [mounted, fetchOperationalData]);
 
   // 3. Persistent 0ms WebSocket broadcast receiver for selected trip in Monitor
   React.useEffect(() => {
@@ -754,7 +781,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans select-none overflow-x-hidden">
+    <div className="h-screen h-[100dvh] bg-slate-50 text-slate-900 flex flex-col font-sans select-none overflow-hidden">
       
       {/* Dynamic S.O.S Header Alert Overlay */}
       <AnimatePresence>
@@ -797,26 +824,58 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Global telemetry metadata */}
-        <div className="flex items-center space-x-4 sm:space-x-6 text-xs font-mono text-slate-600">
+        {/* Global telemetry metadata & Real-Time Sync Console */}
+        <div className="flex items-center space-x-2 sm:space-x-4 text-xs font-mono text-slate-600">
           <div className="hidden md:flex flex-col text-right">
-            <span className="text-slate-400 text-[9.5px] uppercase">Control Operator</span>
+            <span className="text-slate-400 text-[9.5px] uppercase tracking-wider">Control Operator</span>
             <span className="text-blue-600 font-medium font-sans font-semibold text-xs">{currentUser?.email}</span>
           </div>
 
           <div className="h-5 w-px bg-slate-200 hidden md:block"></div>
 
-          <div className="flex items-center space-x-2 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700">
-            <span className={`h-2 w-2 rounded-full ${hasSupabaseConfig() ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-pulse'}`}></span>
-            <span className="text-[9.5px] uppercase font-bold tracking-wider">
-              {hasSupabaseConfig() ? 'SUPABASE CLOUD ACTIVE' : 'LOCAL CACHE MODE'}
-            </span>
+          {/* Real-time Cloud Status with Last Sync Time */}
+          <div 
+            className="flex items-center space-x-2 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700 select-none"
+            title={lastSyncTime ? `Last operational sync: ${lastSyncTime.toLocaleTimeString()}` : 'Connecting real-time channel...'}
+          >
+            <span className={`h-2 w-2 rounded-full shrink-0 ${
+              realtimeStatus === 'connected' 
+                ? 'bg-emerald-500 animate-pulse' 
+                : realtimeStatus === 'connecting' 
+                ? 'bg-amber-500 animate-pulse' 
+                : 'bg-red-500'
+            }`}></span>
+            <div className="flex flex-col leading-none">
+              <span className="text-[9.5px] uppercase font-bold tracking-wider text-slate-800">
+                {hasSupabaseConfig() ? (realtimeStatus === 'connected' ? 'LIVE SYNC' : 'RECONNECTING') : 'LOCAL CACHE'}
+              </span>
+              <span className="text-[8px] text-slate-500 font-mono mt-0.5">
+                {isSyncing ? 'Syncing...' : (lastSyncTime ? `${lastSyncTime.toLocaleTimeString()}` : 'Ready')}
+              </span>
+            </div>
           </div>
+
+          {/* Instant 1-Click Refresh Button */}
+          <button
+            type="button"
+            onClick={() => fetchOperationalData(false)}
+            disabled={isSyncing}
+            className={`p-1.5 rounded-lg border transition-all flex items-center justify-center cursor-pointer ${
+              isSyncing 
+                ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm' 
+                : 'bg-white border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-slate-50 hover:border-slate-300'
+            } active:scale-95`}
+            title="Instant Refresh: Click to immediately sync all data without reloading the page"
+          >
+            <span className={`material-icons text-base ${isSyncing ? 'animate-spin text-blue-600' : ''}`}>
+              sync
+            </span>
+          </button>
         </div>
       </header>
 
       {/* Core Layout Canvas */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         
         {/* SIDE NAVIGATION PANEL */}
         {sidebarOpen && (
@@ -827,7 +886,7 @@ export default function AdminDashboardPage() {
         )}
 
         <nav className={`bg-slate-900 border-r border-slate-800 transition-all duration-300 flex flex-col justify-between shrink-0
-          fixed inset-y-0 left-0 z-50 h-full shadow-2xl md:relative md:h-auto md:shadow-none md:translate-x-0
+          fixed inset-y-0 left-0 z-50 h-full shadow-2xl md:relative md:h-full md:shadow-none md:translate-x-0
           ${sidebarOpen ? 'w-60 translate-x-0' : 'w-0 -translate-x-full md:w-16 md:-translate-x-0 overflow-hidden md:overflow-visible'}`} id="side-nav">
           <div className="py-4 flex-1 overflow-y-auto">
             
@@ -839,7 +898,7 @@ export default function AdminDashboardPage() {
                   <button 
                     type="button" 
                     onClick={handleLogout}
-                    title="Log Out Terminal"
+                    title="Log Out"
                     className="text-red-400 hover:text-red-300 focus:outline-none flex items-center justify-center space-x-1 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded text-[9px] transition-all cursor-pointer font-bold border border-red-500/20"
                   >
                     <span className="material-icons text-xs">logout</span>
@@ -859,7 +918,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex items-center space-x-1.5 mt-2.5">
                   <span className="h-1.5 w-1.5 bg-green-500 rounded-full animate-ping"></span>
-                  <p className="text-[9px] text-green-400 font-mono tracking-wide leading-none uppercase">RECEIVING GPS TELEMETRY</p>
+                  <p className="text-[9px] text-green-400 font-mono tracking-wide leading-none uppercase">GPS TRACKING ACTIVE</p>
                 </div>
               </div>
             )}
@@ -875,11 +934,11 @@ export default function AdminDashboardPage() {
                 <ul className="space-y-1">
                   {[
                     { id: 'dashboard', label: 'Dashboard', icon: 'space_dashboard' },
-                    { id: 'monitor', label: 'Monitor Console', icon: 'radar' },
-                    { id: 'sos', label: 'SOS Crisis Center', icon: 'security', isDanger: true },
-                    { id: 'trips', label: 'Vehicle & Plate Vault', icon: 'directions_car' },
-                    { id: 'audio', label: 'Audio Blackbox Vault', icon: 'graphic_eq' },
-                    { id: 'users', label: 'Traveler Registry', icon: 'people' },
+                    { id: 'monitor', label: 'Live Map & Tracking', icon: 'map' },
+                    { id: 'sos', label: 'SOS Emergency Alerts', icon: 'security', isDanger: true },
+                    { id: 'trips', label: 'Vehicle & Driver Records', icon: 'directions_car' },
+                    { id: 'audio', label: 'Emergency Audio Records', icon: 'graphic_eq' },
+                    { id: 'users', label: 'Registered Travelers', icon: 'people' },
                     { id: 'plans', label: 'Subscription Plans', icon: 'workspace_premium', badge: pendingPaymentsCount },
                   ].map(item => {
                     const isActive = activeTab === item.id;
@@ -937,15 +996,16 @@ export default function AdminDashboardPage() {
                 </ul>
               </div>
 
-              {/* SECTION 2: HOMEPAGE SETTINGS */}
+              {/* SECTION 2: MONETIZATION & ADS */}
               <div>
                 {sidebarOpen && (
                   <p className="px-3 py-1.5 text-[9.5px] font-mono font-bold text-slate-500 uppercase tracking-widest select-none border-t border-slate-800/30 mt-2 pt-3">
-                    Homepage
+                    Monetization
                   </p>
                 )}
                 <ul className="space-y-1">
                   {[
+                    { id: 'ads', label: 'Ad Monetization', icon: 'campaign' },
                     { id: 'homepage', label: 'Promo Banner', icon: 'aspect_ratio' },
                   ].map(item => {
                     const isActive = activeTab === item.id;
@@ -1063,8 +1123,11 @@ export default function AdminDashboardPage() {
           </div>
         </nav>
 
-        {/* MAIN TELEMETRY VIEWS CANVAS */}
-        <main className="flex-1 bg-slate-50 overflow-y-auto flex flex-col">
+        {/* CONTENT & FOOTER COLUMN */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+
+          {/* MAIN TELEMETRY VIEWS CANVAS */}
+          <main className="flex-1 bg-slate-50 overflow-y-auto min-h-0 flex flex-col">
           
           <div className="p-2.5 sm:p-3.5 md:p-4 lg:p-4.5 w-full mx-auto flex-1 flex flex-col space-y-3.5">
             {/* 1. OPERATIONS DASHBOARD (EXECUTIVE OVERVIEW) */}
@@ -1157,7 +1220,12 @@ export default function AdminDashboardPage() {
               <PromoBannerSection db={db} setDb={setDb} currentUser={currentUser} />
             )}
 
-            {/* 8. SYSTEM SETTINGS TAB */}
+            {/* 8. AD MONETIZATION & IN-APP ADVERTISING TAB */}
+            {activeTab === 'ads' && (
+              <AdMonetizationSection />
+            )}
+
+            {/* 9. SYSTEM SETTINGS TAB */}
             {activeTab === 'settings' && (
               <SystemSettingsSection />
             )}
@@ -1178,13 +1246,14 @@ export default function AdminDashboardPage() {
 
 
           </div>
-
-          {/* Master operational footer bar */}
-          <footer className="border-t border-slate-200 py-4 px-6 text-center text-[10.5px] text-slate-500 bg-white mt-auto shrink-0 font-mono uppercase tracking-wider">
-            Safe Travel Transit Control Console &copy; 2026 Operations Dispatch Division. Connected as mdsadakkas86@gmail.com
-          </footer>
-
         </main>
+
+        {/* Master operational footer bar (FIXED AT BOTTOM) */}
+        <footer className="border-t border-slate-200 py-2.5 px-6 text-center text-[10.5px] text-slate-500 bg-white shrink-0 font-mono uppercase tracking-wider z-20" id="fixed-dashboard-footer">
+          Safe Travel Transit Control Console &copy; 2026 Operations Dispatch Division. Connected as {currentUser?.email || 'mdsadakkas86@gmail.com'}
+        </footer>
+
+      </div>
 
       </div>
     </div>

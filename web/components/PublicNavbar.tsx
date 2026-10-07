@@ -35,7 +35,7 @@ export default function PublicNavbar() {
                 Safe<span className="text-emerald-400">Travel</span>
               </span>
               <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mt-0.5">
-                SAFETY INTELLIGENCE
+                TRAVEL SAFETY PLATFORM
               </span>
             </div>
           </Link>
@@ -43,7 +43,7 @@ export default function PublicNavbar() {
           {/* Live Operational Indicator (Desktop) */}
           <div className="hidden lg:flex items-center space-x-2 bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[10px] font-mono text-emerald-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></span>
-            <span className="font-semibold uppercase tracking-wider">{t('SYSTEM OPERATIONAL &bull; 0ms', 'সিস্টেম একটিভ &bull; ০-মিলিসেকেন্ড')}</span>
+            <span className="font-semibold uppercase tracking-wider">{t('SYSTEM ACTIVE &bull; READY', 'সিস্টেম সক্রিয় &bull; প্রস্তুত')}</span>
           </div>
         </div>
 

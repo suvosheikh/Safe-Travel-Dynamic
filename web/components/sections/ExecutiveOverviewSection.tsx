@@ -237,7 +237,7 @@ export default function ExecutiveOverviewSection({
         id: `audio-${log.id}`,
         tripId: log.trip_id || log.id,
         type: 'audio',
-        title: 'Safety Audio Blackbox Uploaded',
+        title: 'Safety Audio Recording Saved',
         description: `15s encrypted recording captured • Trigger: ${log.source_trigger || 'Periodic Safety'}`,
         travelerName: traveler?.full_name || 'Traveler',
         timestamp: log.created_at || '',
@@ -304,7 +304,7 @@ export default function ExecutiveOverviewSection({
             </h1>
           </div>
           <p className="text-slate-400 text-xs pl-10.5">
-            Real-time platform overview of active journeys, emergency alarms, verified vehicle vaults, and device health.
+            Real-time platform overview of active journeys, emergency alarms, vehicle records, and traveler safety.
           </p>
         </div>
         
@@ -323,8 +323,8 @@ export default function ExecutiveOverviewSection({
             onClick={() => setActiveTab('monitor')}
             className="flex items-center gap-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer hover:shadow-lg hover:shadow-cyan-950/50"
           >
-            <span className="material-icons text-sm">radar</span>
-            <span>Live Monitor Radar</span>
+            <span className="material-icons text-sm">map</span>
+            <span>Live Tracking Map</span>
           </button>
         </div>
       </div>
@@ -342,7 +342,7 @@ export default function ExecutiveOverviewSection({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Transits</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Trips</p>
               <span className="text-[9px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">
                 LIVE
               </span>
@@ -389,12 +389,12 @@ export default function ExecutiveOverviewSection({
               {activeSosCount} <span className="text-xs font-normal text-slate-400">active alerts</span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-1 truncate">
-              {activeSosCount > 0 ? 'Triage dispatch required' : 'Zero emergency incidents'}
+              {activeSosCount > 0 ? 'Immediate assistance needed' : 'Zero emergency incidents'}
             </p>
           </div>
         </div>
 
-        {/* KPI 3: Verified Boarding Vault */}
+        {/* KPI 3: Verified Vehicle Records */}
         <div 
           onClick={() => setActiveTab('trips')}
           className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-cyan-500/40 p-4 rounded-2xl transition-all cursor-pointer group flex items-start space-x-3.5 shadow-sm"
@@ -404,21 +404,21 @@ export default function ExecutiveOverviewSection({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Boarding Vault</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vehicle & Driver Records</p>
               <span className="text-[9px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1.5 py-0.5 rounded">
-                EVIDENCE
+                VERIFIED
               </span>
             </div>
             <h2 className="text-2xl font-bold text-white font-sans mt-0.5">
               {verifiedBoardingCount} <span className="text-xs font-normal text-slate-400">records</span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-1 truncate">
-              Cloudinary snapshots & plates
+              Saved photos & license plates
             </p>
           </div>
         </div>
 
-        {/* KPI 4: Cloud Audio Blackbox */}
+        {/* KPI 4: Emergency Audio Recordings */}
         <div 
           onClick={() => setActiveTab('audio')}
           className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-purple-500/40 p-4 rounded-2xl transition-all cursor-pointer group flex items-start space-x-3.5 shadow-sm"
@@ -428,16 +428,16 @@ export default function ExecutiveOverviewSection({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Audio Blackbox</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Audio Recordings</p>
               <span className="text-[9px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1.5 py-0.5 rounded">
-                ENCRYPTED
+                SECURED
               </span>
             </div>
             <h2 className="text-2xl font-bold text-white font-sans mt-0.5">
               {audioVaultCount} <span className="text-xs font-normal text-slate-400">recordings</span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-1 truncate">
-              15s acoustic safety clips
+              Emergency voice recordings
             </p>
           </div>
         </div>
@@ -576,7 +576,7 @@ export default function ExecutiveOverviewSection({
               <div className="flex items-center space-x-2">
                 <span className="material-icons text-amber-400 text-lg">battery_alert</span>
                 <h3 className="text-sm font-semibold text-white tracking-wide">
-                  Device & Telemetry Watchdog
+                  Device Battery & Health Monitor
                 </h3>
               </div>
               <span className="text-[10px] font-mono text-slate-400">
@@ -674,7 +674,7 @@ export default function ExecutiveOverviewSection({
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               </h4>
               <p className="text-[11px] text-emerald-400">
-                Realtime WebSockets & Media Vault Active
+                Realtime Updates & Media Storage Active
               </p>
             </div>
           </div>

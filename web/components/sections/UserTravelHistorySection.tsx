@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { DbState, TravelActivity } from '../../lib/supabase';
+import { calculateRealTripDistance, calculateTotalRealDistance, formatRealTripDuration } from '../../lib/TripDistanceCalculator';
 
 const TripDetailsModal = dynamic(() => import('../TripDetailsModal'), { ssr: false });
 
@@ -82,15 +83,15 @@ export default function UserTravelHistorySection({
           return new Date((a.start_time || a.created_at) as string).getTime() - new Date((b.start_time || b.created_at) as string).getTime();
         }
         if (sortBy === 'distance') {
-          return (b.total_distance || 0) - (a.total_distance || 0);
+          return calculateRealTripDistance(b) - calculateRealTripDistance(a);
         }
         return 0;
       });
   }, [userActivities, statusFilter, modeFilter, searchQuery, sortBy, db.sosRecords]);
 
-  // Aggregate Metrics
+  // Aggregate Metrics (Strictly real route distance traveled)
   const metrics = useMemo(() => {
-    const totalKm = userActivities.reduce((acc, curr) => acc + (curr.total_distance || curr.estimated_distance_km || 0), 0);
+    const totalKm = calculateTotalRealDistance(userActivities);
     const sosCount = userActivities.filter(a => a.safety_status === 'sos' || db.sosRecords.some(s => s.trip_id === a.id)).length;
     const completedCount = userActivities.filter(a => a.safety_status === 'completed' || a.end_time).length;
     const ongoingCount = userActivities.filter(a => a.safety_status === 'ongoing' || (!a.end_time && a.safety_status !== 'sos')).length;
@@ -164,7 +165,7 @@ export default function UserTravelHistorySection({
               </div>
               <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                 <span className="material-icons text-sm text-blue-500">route</span>
-                <span>Complete Route & Telemetry Logs Vault</span>
+                <span>Complete Trip & Route History</span>
               </p>
             </div>
           </div>
@@ -328,6 +329,9 @@ export default function UserTravelHistorySection({
                 minute: '2-digit'
               });
 
+              const realDistance = calculateRealTripDistance(trip);
+              const realDuration = formatRealTripDuration(trip);
+
               return (
                 <div
                   key={trip.id}
@@ -398,17 +402,17 @@ export default function UserTravelHistorySection({
 
                     {/* Telemetry Snapshot Badges */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      {trip.total_distance != null && (
+                      {realDistance > 0 && (
                         <span className="text-[10px] font-mono bg-slate-50 text-slate-600 px-2 py-0.5 rounded border border-slate-200 flex items-center gap-1">
                           <span className="material-icons text-[11px] text-slate-400">straighten</span>
-                          {trip.total_distance.toFixed(1)} km
+                          {realDistance.toFixed(1)} km
                         </span>
                       )}
 
-                      {trip.estimated_duration_min != null && (
+                      {realDuration && (
                         <span className="text-[10px] font-mono bg-slate-50 text-slate-600 px-2 py-0.5 rounded border border-slate-200 flex items-center gap-1">
                           <span className="material-icons text-[11px] text-slate-400">schedule</span>
-                          {trip.estimated_duration_min} min
+                          {realDuration}
                         </span>
                       )}
 

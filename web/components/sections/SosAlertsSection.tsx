@@ -68,10 +68,10 @@ export default function SosAlertsSection({
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-800 flex items-center">
             <span className="material-icons text-red-600 mr-2 text-2xl animate-pulse">security</span>
-            Emergency S.O.S Crisis Center
+            Emergency SOS Alerts
           </h1>
           <p className="text-slate-500 text-xs mt-0.5">
-            Mission control dispatch queue, instant incident triage, and forensic safety audit logs.
+            Live emergency alerts, response actions, and SOS incident history.
           </p>
         </div>
 
@@ -79,12 +79,12 @@ export default function SosAlertsSection({
           {activeSOSRecords.length > 0 ? (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-2 text-xs font-mono font-bold animate-pulse">
               <span className="w-2.5 h-2.5 rounded-full bg-red-600"></span>
-              <span>{activeSOSRecords.length} ACTIVE CRISIS DISPATCHING</span>
+              <span>{activeSOSRecords.length} ACTIVE EMERGENCY ALERTS</span>
             </div>
           ) : (
             <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-2 text-xs font-mono font-bold">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-              <span>ALL FLEET SECURE &bull; ZERO ACTIVE SOS</span>
+              <span>ALL CLEAR &bull; ZERO ACTIVE SOS</span>
             </div>
           )}
         </div>
@@ -95,9 +95,9 @@ export default function SosAlertsSection({
         {/* Sub Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
           {[
-            { id: 'active', label: 'Active Red Alerts', count: activeSOSRecords.length, icon: 'warning', danger: true },
-            { id: 'all', label: 'Incident Archives', count: db.sosRecords.length, icon: 'archive' },
-            { id: 'forensics', label: 'Forensic Audit Trails', count: forensicTrips.length, icon: 'manage_search' },
+            { id: 'active', label: 'Active Alerts', count: activeSOSRecords.length, icon: 'warning', danger: true },
+            { id: 'all', label: 'Incident History', count: db.sosRecords.length, icon: 'archive' },
+            { id: 'forensics', label: 'SOS Timelines', count: forensicTrips.length, icon: 'manage_search' },
           ].map(tab => {
             const active = subTab === tab.id;
             return (
@@ -159,17 +159,17 @@ export default function SosAlertsSection({
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="font-mono text-xs font-bold uppercase text-slate-700">Forensic Audit Trails</h3>
-              <p className="text-slate-400 text-[11px]">Trips with recorded SOS activity timelines, periodic safety check audits, and telemetry logs.</p>
+              <h3 className="font-mono text-xs font-bold uppercase text-slate-700">SOS Incident Timelines</h3>
+              <p className="text-slate-400 text-[11px]">Trips with recorded SOS emergency alerts, safety check responses, and location logs.</p>
             </div>
             <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600">
-              {forensicTrips.length} AUDIT LOGS RECORDED
+              {forensicTrips.length} INCIDENT LOGS RECORDED
             </span>
           </div>
 
           {forensicTrips.length === 0 ? (
             <div className="py-12 text-center text-slate-400 font-mono text-xs">
-              NO FORENSIC AUDIT TRAILS FOUND
+              NO SOS INCIDENT LOGS FOUND
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

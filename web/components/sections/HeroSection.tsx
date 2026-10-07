@@ -37,7 +37,7 @@ export default function HeroSection() {
       >
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]"></span>
         <span className="text-[10px] md:text-xs font-mono text-emerald-300 tracking-wider uppercase font-bold">
-          {t('[LIVE PASSENGER PROTECTION] Zero Mock GPS &bull; Cloud Telemetry', '[লাইভ প্যাসেঞ্জার প্রটেকশন] রিয়েল জিপিএস ও ক্লাউড টেলিমেট্রি')}
+          {t('LIVE PASSENGER SAFETY &bull; REAL-TIME LOCATION SHARING', 'যাত্রীদের লাইভ নিরাপত্তা &bull; রিয়েল-টাইম লোকেশন ট্র্যাকিং')}
         </span>
       </motion.div>
 
@@ -62,8 +62,8 @@ export default function HeroSection() {
         className="text-sm sm:text-base md:text-xl text-slate-300 max-w-3xl mb-8 md:mb-10 font-normal leading-relaxed px-2"
       >
         {t(
-          'Taking a late-night CNG, rideshare, or bus? Snap your vehicle plate before boarding, share live 0ms GPS with family via WhatsApp, and stay protected with automated 2-second SOS & cloud audio blackbox recording.',
-          'সিএনজি, বাস বা রাইডশেয়ারে ভ্রমণকালে গাড়ির ছবি তুলুন, অভিভাবকের হোয়াটসঅ্যাপে ০-মিলিসেকেন্ড লাইভ ট্র্যাকিং শেয়ার করুন এবং ২-সেকেন্ড স্মার্ট এসওএস ও অডিও ব্ল্যাকবক্সে থাকুন সম্পূর্ণ নিরাপদ।'
+          'Taking a late-night ride, taxi, or bus? Snap your vehicle photo before boarding, share your live location with family via WhatsApp, and stay protected with instant 2-second SOS and emergency audio recording.',
+          'সিএনজি, বাস বা ট্যাক্সি নিয়ে ভ্রমণ করছেন? গাড়ির ছবি তুলুন, পরিবারের সাথে হোয়াটসঅ্যাপে লাইভ লোকেশন শেয়ার করুন এবং বিপদের সময় ২-সেকেন্ডের এসওএস ও জরুরি অডিও রেকর্ডিংয়ে থাকুন নিরাপদ।'
         )}
       </motion.p>
 
@@ -164,7 +164,7 @@ export default function HeroSection() {
           {/* Dynamic Island */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 md:w-32 h-6 bg-black rounded-full z-40 flex items-center justify-between px-3 border border-slate-800/80">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-            <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase">GPS 0ms</span>
+            <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase">LIVE GPS</span>
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
           </div>
 
@@ -232,10 +232,10 @@ export default function HeroSection() {
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase flex items-center gap-1">
                   <span className="material-icons text-[11px]">verified</span>
-                  {t('VEHICLE VERIFICATION VAULT', 'ভেহিকেল ভেরিফিকেশন ভল্ট')}
+                  {t('VEHICLE & DRIVER DETAILS', 'গাড়ির তথ্য ও ছবি')}
                 </span>
                 <span className="bg-emerald-500/20 text-emerald-300 text-[8.5px] font-mono font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
-                  EVIDENCE SECURED
+                  SAVED SECURELY
                 </span>
               </div>
 
@@ -279,7 +279,7 @@ export default function HeroSection() {
               <div className="flex items-center justify-between bg-slate-900/80 p-2 rounded-xl border border-slate-800 text-[10px]">
                 <div className="flex items-center gap-1.5">
                   <span className="material-icons text-emerald-400 text-xs">share_location</span>
-                  <span className="text-slate-300 font-medium">{t('Family WhatsApp Radar Active (2 Contacts)', 'পারিবারিক হোয়াটসঅ্যাপ রাডার একটিভ')}</span>
+                  <span className="text-slate-300 font-medium">{t('Family WhatsApp Live Sharing Active (2 Contacts)', 'পরিবারের সাথে লাইভ শেয়ারিং সক্রিয়')}</span>
                 </div>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               </div>
@@ -311,23 +311,23 @@ export default function HeroSection() {
         {[
           {
             icon: 'wifi_tethering',
-            title: t('0ms Realtime Sync', '০-মি.সে. লাইভ ট্র্যাকিং'),
-            desc: t('Instant WebSocket GPS stream to guardian browsers without app install', 'কোনো অ্যাপ ছাড়াই ব্রাউজারে ইনস্ট্যান্ট লাইভ জিপিএস')
+            title: t('Live Location Sharing', 'লাইভ লোকেশন ট্র্যাকিং'),
+            desc: t('Share live location directly to family browsers without installing an app', 'কোনো অ্যাপ ছাড়াই ব্রাউজারে পরিবারের সাথে সরাসরি লাইভ লোকেশন শেয়ার')
           },
           {
             icon: 'directions_car',
-            title: t('Vehicle Plate Vault', 'ভেহিকেল প্লেট ভল্ট'),
-            desc: t('Tamper-proof photo evidence archive before boarding any vehicle', 'যেকোনো বাহনে ওঠার আগেই ছবি ও লাইসেন্স প্লেট সংরক্ষণ')
+            title: t('Vehicle & Driver Photos', 'গাড়ির ছবি ও প্লেট নম্বর'),
+            desc: t('Save vehicle details and photos securely before boarding', 'যেকোনো বাহনে ওঠার আগে ছবি ও লাইসেন্স প্লেট নিরাপদে সংরক্ষণ')
           },
           {
             icon: 'graphic_eq',
-            title: t('Audio Blackbox Cloud', 'ক্লাউড অডিও ব্ল্যাকবক্স'),
-            desc: t('Automatic background audio recording captured on emergency panic', 'জরুরি মুহূর্তে ব্যাকগ্রাউন্ডে স্বয়ংক্রিয় ক্লাউড অডিও রেকর্ড')
+            title: t('Emergency Audio Recording', 'জরুরি অডিও রেকর্ডিং'),
+            desc: t('Automatically record background audio when an emergency SOS is triggered', 'বিপদের সময় ব্যাকগ্রাউন্ডে স্বয়ংক্রিয় অডিও রেকর্ড সংরক্ষণ')
           },
           {
             icon: 'local_police',
             title: t('Direct 999 Hotline', 'জাতীয় হেল্পলাইন ৯৯৯'),
-            desc: t('Instant one-tap emergency police & ambulance dispatch integration', 'জরুরি পুলিশ ও অ্যাম্বুলেন্স সহায়তার তাত্ক্ষণিক হটলাইন')
+            desc: t('Instant one-tap emergency police & ambulance hotline connection', 'জরুরি পুলিশ ও অ্যাম্বুলেন্স সহায়তার তাত্ক্ষণিক হটলাইন')
           }
         ].map((item, idx) => (
           <div 

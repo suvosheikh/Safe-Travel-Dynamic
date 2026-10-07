@@ -132,17 +132,17 @@ export default function AudioBlackboxSection({
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-800 flex items-center">
             <span className="material-icons text-amber-500 mr-2 text-2xl">graphic_eq</span>
-            Audio Blackbox & Safety Evidence Vault
+            Emergency Audio Records
           </h1>
           <p className="text-slate-500 text-xs mt-0.5">
-            Cloudinary forensic voice clips recorded automatically during SOS panic events and periodic safety protocols.
+            Audio clips recorded automatically during SOS emergencies and safety check-ins.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-2 text-xs font-mono">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            <span className="text-slate-500">EVIDENCE FILES:</span>
+            <span className="text-slate-500">RECORDINGS:</span>
             <span className="font-bold text-slate-800">{audioRecords.length} RECORDINGS</span>
           </div>
         </div>
@@ -154,8 +154,8 @@ export default function AudioBlackboxSection({
         <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
           {[
             { id: 'all', label: 'All Audio Logs', count: audioRecords.length, icon: 'queue_music' },
-            { id: 'sos', label: 'SOS Panic Clips', count: totalSosRecordings, icon: 'warning' },
-            { id: 'safety', label: 'Routine Safety Checks', icon: 'verified_user' },
+            { id: 'sos', label: 'SOS Emergency Clips', count: totalSosRecordings, icon: 'warning' },
+            { id: 'safety', label: 'Safety Check-ins', icon: 'verified_user' },
           ].map(tab => {
             const active = filterMode === tab.id;
             return (
@@ -236,7 +236,7 @@ export default function AudioBlackboxSection({
                         <span className="material-icons text-[12px]">
                           {isSos ? 'emergency' : 'shield'}
                         </span>
-                        {isSos ? '[SOS PANIC TRIGGER]' : '[SAFETY PROTOCOL]'}
+                        {isSos ? 'Emergency SOS' : 'Safety Check-In'}
                       </span>
                     </div>
 
@@ -274,7 +274,7 @@ export default function AudioBlackboxSection({
                     <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-2">
                       <span className="flex items-center gap-1 text-amber-400 font-bold">
                         <span className="material-icons text-xs">volume_up</span>
-                        STREAM FROM CLOUDINARY
+                        Secure Cloud Audio
                       </span>
                       <span>
                         DURATION: {formatDuration(item.durationSec)} &bull; {formatFileSize(item.fileSizeBytes)}

@@ -23,7 +23,7 @@ export default function AboutPage() {
             Whether it's a late-night commute from the office or a teenager taking their first solo trip to school, personal security should never be a luxury. Our mission is to provide accessible, reliable, and privacy-focused tracking tools for everyone.
           </p>
           <p className="text-sm md:text-base leading-relaxed">
-            We are a team of dedicated developers, designers, and security experts committed to building technology that protects. By utilizing modern GPS, battery telemetry, and automated alerts, we bridge the gap between technology and peace of mind.
+            We are a team of dedicated developers, designers, and security experts committed to building technology that protects. By utilizing modern GPS, smart battery monitoring, and automated alerts, we bridge the gap between technology and peace of mind.
           </p>
         </div>
 

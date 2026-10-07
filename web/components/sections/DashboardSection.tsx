@@ -11,7 +11,7 @@ const MapboxMonitor = dynamic(() => import('../MapboxMonitor'), {
       <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 animate-pulse">
         <span className="material-icons text-xl animate-spin">autorenew</span>
       </div>
-      <p className="text-slate-400 text-[10.5px] font-mono mt-3 uppercase tracking-wider animate-pulse">Initializing Monitor Satellites...</p>
+      <p className="text-slate-400 text-[10.5px] font-mono mt-3 uppercase tracking-wider animate-pulse">Loading live tracking map...</p>
     </div>
   )
 });
@@ -47,7 +47,10 @@ export default function DashboardSection({
   const totalTripCredits = db.profiles.reduce((sum, p) => sum + p.trip_credits, 0);
   const estimatedRevenue = (premiumProfilesCount * 29) + (totalTripCredits * 12);
 
-  const selectedTrip = db.trips.find(t => t.id === selectedTripId);
+  const isMapVisible = Boolean(selectedTripId && activeTripsList.some(t => t.id === selectedTripId));
+  const selectedTrip = isMapVisible
+    ? (activeTripsList.find(t => t.id === selectedTripId) || db.trips.find(t => t.id === selectedTripId))
+    : null;
   const selectedTripUser = selectedTrip ? db.profiles.find(p => p.id === selectedTrip.user_id) : null;
   const selectedTripSOS = selectedTrip ? db.sosRecords.find(s => s.trip_id === selectedTrip.id && s.status === 'active') : null;
 
@@ -59,10 +62,10 @@ export default function DashboardSection({
         <div className="flex flex-col space-y-1">
           <h1 className="text-xl font-bold tracking-tight text-slate-800 flex items-center" id="dashboard-main-heading">
             <span className="material-icons text-blue-600 mr-2 text-2xl">safety_check</span>
-            Active Safety Monitoring Station
+            Live Trip & Safety Monitor
           </h1>
           <p className="text-slate-500 text-xs" id="dashboard-subheading">
-            Continuous GPS tracking feed from registered premium and cellular transit clients.
+            Real-time GPS tracking and trip status of registered travelers.
           </p>
         </div>
         
@@ -72,7 +75,7 @@ export default function DashboardSection({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
           </span>
-          SYSTEM ONLINE & ENCRYPTED
+          SYSTEM ONLINE & CONNECTED
         </div>
       </div>
 
@@ -85,7 +88,7 @@ export default function DashboardSection({
             <span className="material-icons">people_outline</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Traveler Registry</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Registered Travelers</p>
             <h2 className="text-2xl font-bold text-slate-900 font-sans">{totalProfilesCount} Profiles</h2>
             <p className="text-[10px] text-blue-600 font-medium mt-0.5">
               {premiumProfilesCount} Premium Accounts
@@ -107,12 +110,12 @@ export default function DashboardSection({
             <span className="material-icons">gpp_maybe</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-[10px] uppercase tracking-widest mb-0.5 font-bold ${activeSOSRecords.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>Active SOS Signals</p>
+            <p className={`text-[10px] uppercase tracking-widest mb-0.5 font-bold ${activeSOSRecords.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>Active SOS Alerts</p>
             <h2 className={`text-2xl font-bold font-sans ${activeSOSRecords.length > 0 ? 'text-red-650' : 'text-slate-900'}`}>
               {activeSOSRecords.length} Active Alerts
             </h2>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {activeSOSRecords.length > 0 ? 'Response dispatch active' : 'Zero incidents reported'}
+              {activeSOSRecords.length > 0 ? 'Immediate attention required' : 'All safe right now'}
             </p>
           </div>
         </div>
@@ -123,7 +126,7 @@ export default function DashboardSection({
             <span className="material-icons">navigation</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Active Transits</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Active Trips</p>
             <h2 className="text-2xl font-bold text-slate-900 font-sans">
               {db.trips.filter(t => t.status === 'ongoing').length} Track(s)
             </h2>
@@ -154,19 +157,19 @@ export default function DashboardSection({
       {/* Main Visual Layout Grid (Map + Active Dispatch Feeds) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 flex-1" id="dashboard-main-grid">
         
-        {/* Left Column: List of Transit Signals & Emergency controls (span 7) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-4 text-slate-900" id="dashboard-signals-panel">
+        {/* Left Column: List of Transit Signals & Emergency controls (span 12 if map is closed, span 7 if map is open) */}
+        <div className={`${isMapVisible ? 'lg:col-span-7' : 'lg:col-span-12'} bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-4 text-slate-900 transition-all duration-300`} id="dashboard-signals-panel">
           
           <div className="flex items-center justify-between" id="signals-header-bar">
             <div className="flex items-center space-x-2">
               <span className="material-icons text-blue-600 text-sm animate-pulse">online_prediction</span>
               <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
-                Connected Travel Telemetry Feeds ({activeTripsList.length})
+                Active Live Trips ({activeTripsList.length})
               </h3>
             </div>
             <div className="flex items-center space-x-1 text-[10px] text-emerald-600 font-mono bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 rounded-lg shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold">LIVE DISPATCH FEED</span>
+              <span className="font-semibold">LIVE TRIPS FEED</span>
             </div>
           </div>
 
@@ -185,7 +188,7 @@ export default function DashboardSection({
                 {activeTripsList.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-mono bg-white">
-                      NO ACTIVE VEHICLE TELEMETRY OR TRAVEL SIGNALS ENGAGED.
+                      NO ACTIVE TRIPS RUNNING AT THE MOMENT.
                     </td>
                   </tr>
                 ) : (
@@ -201,7 +204,7 @@ export default function DashboardSection({
                       <tr 
                         key={trip.id}
                         id={`trip-row-${trip.id}`}
-                        onClick={() => setSelectedTripId(trip.id)}
+                        onClick={() => setSelectedTripId(isSelected ? null : trip.id)}
                         className={`cursor-pointer transition-all ${
                           isSelected ? 'bg-blue-50/55 border-l-2 border-blue-600' : 'hover:bg-slate-50/70'
                         } ${isSOS ? 'bg-rose-50/40 hover:bg-rose-50/60' : ''}`}
@@ -271,9 +274,23 @@ export default function DashboardSection({
                           )}
                         </td>
                         <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          {isSOS ? (
-                            <div className="flex items-center justify-end space-x-1.5">
-                              {(() => {
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTripId(isSelected ? null : trip.id)}
+                              className={`inline-flex items-center gap-1 font-mono text-[9.5px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded transition-all cursor-pointer shadow-xs ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/60'
+                              }`}
+                              title={isSelected ? 'Close Live Map' : 'Track on Live Satellite Map'}
+                            >
+                              <span className="material-icons text-xs">{isSelected ? 'close' : 'map'}</span>
+                              <span>{isSelected ? 'CLOSE MAP' : 'TRACK MAP'}</span>
+                            </button>
+
+                            {isSOS ? (
+                              (() => {
                                 const r = db.sosRecords.find(s => s.trip_id === trip.id && s.status === 'active');
                                 return r ? (
                                   <button
@@ -285,18 +302,18 @@ export default function DashboardSection({
                                     RESOLVE CASE
                                   </button>
                                 ) : null;
-                              })()}
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => triggerSos(trip.id)}
-                              className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white font-mono text-[9.5px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded cursor-pointer transition-all shadow-sm"
-                              id={`trigger-sos-btn-${trip.id}`}
-                            >
-                              TRIGGER S.O.S
-                            </button>
-                          )}
+                              })()
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => triggerSos(trip.id)}
+                                className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white font-mono text-[9.5px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded cursor-pointer transition-all shadow-sm"
+                                id={`trigger-sos-btn-${trip.id}`}
+                              >
+                                TRIGGER S.O.S
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -324,7 +341,7 @@ export default function DashboardSection({
                   <div 
                     key={trip.id}
                     id={`mobile-card-${trip.id}`}
-                    onClick={() => setSelectedTripId(trip.id)}
+                    onClick={() => setSelectedTripId(isSelected ? null : trip.id)}
                     className={`p-4 rounded-xl border transition-all cursor-pointer ${
                       isSelected ? 'border-blue-500 bg-blue-50/35 ring-1 ring-blue-100' : 'border-slate-200 bg-white'
                     } ${isSOS ? 'border-red-400 bg-red-50/30' : ''}`}
@@ -370,30 +387,43 @@ export default function DashboardSection({
 
                     <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg" onClick={(e) => e.stopPropagation()}>
                       <span className="font-mono text-[9px] text-slate-450">{activity.transport_mode || 'Shuttle'}</span>
-                      {isSOS ? (
-                        (() => {
-                          const r = db.sosRecords.find(s => s.trip_id === trip.id && s.status === 'active');
-                          return r ? (
-                            <button
-                              type="button"
-                              onClick={() => resolveSos(r.id)}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded cursor-pointer"
-                              id={`mobile-resolve-btn-${trip.id}`}
-                            >
-                              RESOLVE
-                            </button>
-                          ) : null;
-                        })()
-                      ) : (
+                      <div className="flex items-center space-x-1.5">
                         <button
                           type="button"
-                          onClick={() => triggerSos(trip.id)}
-                          className="bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 font-mono text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded cursor-pointer transition-colors"
-                          id={`mobile-trigger-sos-btn-${trip.id}`}
+                          onClick={() => setSelectedTripId(isSelected ? null : trip.id)}
+                          className={`font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-blue-50 text-blue-600 border border-blue-200'
+                          }`}
                         >
-                          TRIG SOS
+                          {isSelected ? 'CLOSE MAP' : 'TRACK MAP'}
                         </button>
-                      )}
+                        {isSOS ? (
+                          (() => {
+                            const r = db.sosRecords.find(s => s.trip_id === trip.id && s.status === 'active');
+                            return r ? (
+                              <button
+                                type="button"
+                                onClick={() => resolveSos(r.id)}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded cursor-pointer"
+                                id={`mobile-resolve-btn-${trip.id}`}
+                              >
+                                RESOLVE
+                              </button>
+                            ) : null;
+                          })()
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => triggerSos(trip.id)}
+                            className="bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 font-mono text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded cursor-pointer transition-colors"
+                            id={`mobile-trigger-sos-btn-${trip.id}`}
+                          >
+                            TRIG SOS
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -418,7 +448,7 @@ export default function DashboardSection({
                   <div className="flex items-center space-x-2">
                     <span className="h-2 w-2 bg-rose-600 rounded-full animate-ping"></span>
                     <span className="font-mono text-[10px] text-slate-400 uppercase tracking-widest font-black">
-                      TACTICAL TELEMETRY DEEP ANALYSIS
+                      DETAILED TRIP & SAFETY ANALYSIS
                     </span>
                   </div>
                   <span className="font-mono text-[10.5px] text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 font-bold">
@@ -609,49 +639,60 @@ export default function DashboardSection({
 
         </div>
 
-        {/* Right Column: Visual Radar and Simulated Map (span 5) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-4" id="dashboard-radar-panel">
-          
-          <div className="flex items-center justify-between" id="radar-header-bar">
-            <div className="flex items-center space-x-2">
-              <span className="material-icons text-blue-600 text-sm">satellite_alt</span>
-              <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
-                Active Radar Monitor Screen
-              </h3>
-            </div>
+        {/* Right Column: Visual Radar and Live Map (span 5, conditionally shown ONLY when a trip is selected!) */}
+        {isMapVisible && (
+          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-4 lg:sticky lg:top-2 self-start lg:max-h-[calc(100vh-120px)] animate-fadeIn" id="dashboard-radar-panel">
             
-            <div className="flex items-center space-x-2.5">
-              <div className="flex items-center space-x-1">
-                <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping"></span>
-                <span className="font-mono text-[9px] text-blue-600 tracking-wider select-none">SWEEP LIVE</span>
+            <div className="flex items-center justify-between" id="radar-header-bar">
+              <div className="flex items-center space-x-2">
+                <span className="material-icons text-blue-600 text-sm">satellite_alt</span>
+                <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Live Trip Map View
+                </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsMaximized(true)}
-                className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/40 hover:border-blue-300 p-1.5 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                title="Expand Radar to Fullscreen Grid"
-                id="radar-expand-button"
-              >
-                <span className="material-icons text-sm leading-none">open_in_full</span>
-              </button>
+              
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping"></span>
+                  <span className="font-mono text-[9px] text-blue-600 tracking-wider select-none">LIVE GPS</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMaximized(true)}
+                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200/40 hover:border-blue-300 p-1.5 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                  title="Expand Map to Fullscreen"
+                  id="radar-expand-button"
+                >
+                  <span className="material-icons text-sm leading-none">open_in_full</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTripId(null)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 p-1.5 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                  title="Close Map View (Expand Table to Full Width)"
+                  id="radar-close-button"
+                >
+                  <span className="material-icons text-sm leading-none">close</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Live Satellite Mapbox Map Container */}
-          <div className="flex-1 min-h-[350px] relative rounded-xl overflow-hidden flex flex-col" id="monitor-mapbox-container">
-            <MapboxMonitor
-              activeTripsList={activeTripsList}
-              profiles={db.profiles}
-              selectedTripId={selectedTripId}
-              onSelectTrip={(tripId) => setSelectedTripId(tripId)}
-            />
-          </div>
+            {/* Live Satellite Mapbox Map Container */}
+            <div className="flex-1 min-h-[380px] lg:min-h-[440px] relative rounded-xl overflow-hidden flex flex-col" id="monitor-mapbox-container">
+              <MapboxMonitor
+                activeTripsList={activeTripsList}
+                profiles={db.profiles}
+                selectedTripId={selectedTripId}
+                onSelectTrip={(tripId) => setSelectedTripId(tripId)}
+              />
+            </div>
 
-          <div className="text-[10px] text-slate-500 text-center font-mono uppercase bg-slate-100 p-2.5 rounded border border-slate-200">
-            GRID MAP COORDINATES RENDERED LIVE VIA MAPBOX GL SATELLITE ENGINE
-          </div>
+            <div className="text-[10px] text-slate-500 text-center font-mono uppercase bg-slate-100 p-2.5 rounded border border-slate-200">
+              GRID MAP COORDINATES RENDERED LIVE VIA MAPBOX GL SATELLITE ENGINE
+            </div>
 
-        </div>
+          </div>
+        )}
 
       </div>
 
@@ -673,10 +714,10 @@ export default function DashboardSection({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 text-sm tracking-tight">
-                    Active Satellites Flight Telemetry Node
+                    Full-Screen Live Trip Tracking Map
                   </h3>
                   <p className="text-[10.5px] text-slate-400 font-sans mt-0.5">
-                    Viewing real-time physical transit tracking with synchronized guidance simulator & HUD instruments
+                    Viewing real-time trip route, traveler location, and active status updates
                   </p>
                 </div>
               </div>
@@ -684,7 +725,7 @@ export default function DashboardSection({
               <div className="flex items-center space-x-3">
                 <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 text-[9px] font-mono font-black tracking-widest px-2.5 py-1 rounded-full flex items-center uppercase">
                   <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse mr-1.5"></span>
-                  Active Sweeping
+                  Live GPS Active
                 </span>
                 
                 <button

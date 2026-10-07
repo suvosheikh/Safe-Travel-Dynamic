@@ -19,3 +19,25 @@
     transform: scaleY(1.3);
   }
 }
+
+/* Display Scale Presets for HD / Compact Monitors (FHD Fit Engine) */
+html[data-display-scale="fhd"] {
+  zoom: 0.85;
+}
+
+html[data-display-scale="100"] {
+  zoom: 1;
+}
+
+/* Auto Fit: On HD monitors & laptops (width <= 1440px or height <= 850px), auto-scale to 0.85 for spacious FHD look */
+@media screen and (max-width: 1440px), screen and (max-height: 850px) {
+  html[data-display-scale="auto"] {
+    zoom: 0.85;
+  }
+}
+
+/* Fallback: Ensure modal overlays cover the entire zoomed viewport */
+html[data-display-scale="fhd"] body,
+html[data-display-scale="auto"] body {
+  min-height: 100%;
+}

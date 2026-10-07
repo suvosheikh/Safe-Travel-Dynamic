@@ -252,7 +252,7 @@ export default function PublicTrackingHud({
                 <div className="w-0.5 h-6 bg-gradient-to-b from-blue-500 via-slate-700 to-rose-500 my-0.5 opacity-60"></div>
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider block font-semibold">From (Origin)</span>
+                <span className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider block font-semibold">Pickup Location</span>
                 <p className="text-xs font-medium text-slate-200 truncate leading-snug">{cleanOrigin}</p>
               </div>
             </div>
@@ -263,7 +263,7 @@ export default function PublicTrackingHud({
                 <div className="w-1.5 h-1.5 rounded-full bg-rose-400"></div>
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider block font-semibold">To (Destination)</span>
+                <span className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider block font-semibold">Destination</span>
                 <p className="text-xs font-bold text-white truncate leading-snug">{cleanDest}</p>
               </div>
             </div>
@@ -275,7 +275,7 @@ export default function PublicTrackingHud({
             {!isTripCompleted && (
               <div 
                 className="hidden sm:flex items-center space-x-1.5 shrink-0" 
-                title={isSos ? 'Emergency Alert Active' : 'Transit in progress'}
+                title={isSos ? 'Emergency Alert Active' : 'Trip in progress'}
               >
                 <span className={`text-[11px] font-mono font-bold flex items-center ${
                   isSos ? 'text-red-400' : 'text-emerald-400'
@@ -286,7 +286,7 @@ export default function PublicTrackingHud({
                       : 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#10B981]'
                   }`}></span>
                   <span className="truncate">
-                    {isSos ? 'EMERGENCY SOS ACTIVE' : 'Transit in progress'}
+                    {isSos ? 'EMERGENCY SOS ACTIVE' : 'Trip in progress'}
                   </span>
                 </span>
               </div>

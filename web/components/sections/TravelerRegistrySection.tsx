@@ -65,7 +65,7 @@ export default function TravelerRegistrySection({
       const latestActivity = userActivities.length > 0 ? userActivities[0] : null;
       
       let liveStatus: 'sos' | 'ongoing' | 'offline' = 'offline';
-      let battery = 100;
+      let battery: number | null = null;
       let gpsLost = false;
       let lastLocation = 'No recorded trip history';
       let hasLowBattery = false;
@@ -79,11 +79,11 @@ export default function TravelerRegistrySection({
           liveStatus = 'ongoing';
         }
         
-        battery = latestActivity.end_battery_level || latestActivity.start_battery_level || 100;
+        battery = latestActivity.end_battery_level ?? latestActivity.start_battery_level ?? null;
         gpsLost = Boolean(latestActivity.is_gps_lost);
         lastLocation = latestActivity.end_address || latestActivity.start_address || 'Last GPS Coordinate';
         
-        if (battery <= 20) {
+        if (battery !== null && battery <= 20) {
           hasLowBattery = true;
         }
       }
@@ -390,19 +390,51 @@ export default function TravelerRegistrySection({
                       {/* DEVICE & NETWORK */}
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3 text-xs font-mono">
-                          <div className={`flex items-center gap-1 font-bold ${
-                            profile.battery <= 20 ? 'text-red-500' : profile.battery <= 50 ? 'text-amber-500' : 'text-emerald-600'
-                          }`}>
-                            <span className="material-icons text-[14px]">
-                              {profile.battery <= 20 ? 'battery_alert' : profile.battery < 100 ? 'battery_4_bar' : 'battery_full'}
-                            </span>
-                            {profile.battery}%
-                          </div>
-                          <div className={`flex items-center gap-1 ${profile.gpsLost ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                            <span className="material-icons text-[14px]" title={profile.gpsLost ? 'GPS Signal Lost' : 'Signal OK'}>
-                              {profile.gpsLost ? 'signal_cellular_connected_no_internet_0_bar' : 'signal_cellular_4_bar'}
-                            </span>
-                          </div>
+                          {profile.liveStatus === 'offline' ? (
+                            // Muted Offline State with Informative Hover Tooltips
+                            <>
+                              <div 
+                                className="flex items-center gap-1 font-medium text-slate-400 cursor-help"
+                                title={profile.battery !== null ? `Last reported battery: ${profile.battery}% (Device offline)` : 'No battery data recorded'}
+                              >
+                                <span className="material-icons text-[14px]">
+                                  {profile.battery === null ? 'battery_unknown' : profile.battery <= 20 ? 'battery_alert' : profile.battery < 100 ? 'battery_4_bar' : 'battery_full'}
+                                </span>
+                                <span>{profile.battery !== null ? `${profile.battery}%` : '--'}</span>
+                              </div>
+                              <div 
+                                className="flex items-center gap-1 text-slate-300 cursor-help"
+                                title="Device offline (No active signal)"
+                              >
+                                <span className="material-icons text-[14px]">
+                                  signal_cellular_4_bar
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            // Live Active / SOS State with Dynamic Status Colors
+                            <>
+                              <div 
+                                className={`flex items-center gap-1 font-bold cursor-help ${
+                                  profile.battery === null ? 'text-slate-400' : profile.battery <= 20 ? 'text-red-500' : profile.battery <= 50 ? 'text-amber-500' : 'text-emerald-600'
+                                }`}
+                                title={profile.battery !== null ? `Live battery: ${profile.battery}% (Active trip)` : 'No battery data'}
+                              >
+                                <span className="material-icons text-[14px]">
+                                  {profile.battery === null ? 'battery_unknown' : profile.battery <= 20 ? 'battery_alert' : profile.battery < 100 ? 'battery_4_bar' : 'battery_full'}
+                                </span>
+                                <span>{profile.battery !== null ? `${profile.battery}%` : '--'}</span>
+                              </div>
+                              <div 
+                                className={`flex items-center gap-1 cursor-help ${profile.gpsLost ? 'text-red-500 font-bold' : 'text-slate-400'}`}
+                                title={profile.gpsLost ? 'GPS Signal Lost' : 'Signal Active • GPS Connected'}
+                              >
+                                <span className="material-icons text-[14px]">
+                                  {profile.gpsLost ? 'signal_cellular_connected_no_internet_0_bar' : 'signal_cellular_4_bar'}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
 
@@ -529,7 +561,12 @@ export default function TravelerRegistrySection({
                   </div>
                   <div className="bg-slate-50 p-2 rounded border border-slate-100">
                     <span className="block text-[9.5px] uppercase text-slate-400 font-sans">Battery Status</span>
-                    <span className="font-bold text-slate-800">{selectedUser.battery}% ({selectedUser.gpsLost ? 'GPS Lost' : 'GPS Active'})</span>
+                    <span className={`font-bold ${selectedUser.liveStatus === 'offline' ? 'text-slate-600' : 'text-slate-800'}`}>
+                      {selectedUser.battery !== null ? `${selectedUser.battery}%` : '--'}{' '}
+                      <span className="text-[11px] font-normal text-slate-400 font-sans">
+                        ({selectedUser.liveStatus === 'offline' ? 'Last Recorded • Offline' : selectedUser.gpsLost ? 'GPS Lost' : 'GPS Active'})
+                      </span>
+                    </span>
                   </div>
                   <div className="bg-slate-50 p-2 rounded border border-slate-100">
                     <span className="block text-[9.5px] uppercase text-slate-400 font-sans">Total Trips</span>
@@ -772,7 +809,7 @@ export default function TravelerRegistrySection({
                     className="w-full mt-2 py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <span className="material-icons text-sm">history</span>
-                    <span>Open Travel Vault</span>
+                    <span>View Travel History</span>
                     <span className="material-icons text-sm">chevron_right</span>
                   </button>
                 )}
@@ -783,7 +820,7 @@ export default function TravelerRegistrySection({
             {/* Drawer Footer */}
             <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center shrink-0">
               <span className="text-[10.5px] font-mono text-slate-400">
-                SafeTravel Control Unit
+                SafeTravel Platform
               </span>
               <button 
                 onClick={() => setSelectedUserId(null)}

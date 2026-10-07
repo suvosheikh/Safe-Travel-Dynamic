@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { TravelActivity, Trip, getSupabaseClient } from '../lib/supabase';
+import { calculateRealTripDistance, formatRealTripDuration } from '../lib/TripDistanceCalculator';
 
 const MapboxMonitor = dynamic(() => import('./MapboxMonitor'), {
   ssr: false,
@@ -12,7 +13,7 @@ const MapboxMonitor = dynamic(() => import('./MapboxMonitor'), {
         <span className="material-icons text-lg animate-spin">autorenew</span>
       </div>
       <p className="text-slate-400 text-[10px] font-mono mt-2.5 uppercase tracking-wider animate-pulse">
-        Initializing Monitor Satellites...
+        Loading map view...
       </p>
     </div>
   )
@@ -197,32 +198,15 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
   // Duration computation
   const startTime = activeTrip.start_time ? new Date(activeTrip.start_time) : null;
   const endTime = activeTrip.end_time ? new Date(activeTrip.end_time) : null;
-  let durationText = isOngoing ? 'Ongoing' : '---';
-  if (startTime && endTime) {
-    const diffMs = endTime.getTime() - startTime.getTime();
-    if (diffMs > 0) {
-      const mins = Math.max(1, Math.round(diffMs / 60000));
-      if (mins >= 60) {
-        const hrs = Math.floor(mins / 60);
-        const remMins = mins % 60;
-        durationText = `${hrs}h ${remMins}m`;
-      } else {
-        durationText = `${mins} min`;
-      }
-    }
-  } else if (activeTrip.estimated_duration_min) {
-    const mins = Math.round(Number(activeTrip.estimated_duration_min));
-    durationText = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m (est)` : `${mins} min (est)`;
-  }
+  const durationText = formatRealTripDuration(activeTrip) || (isOngoing ? 'Ongoing' : '---');
 
-  // Distance computation (real data from Supabase, strictly NO mock fallbacks)
-  const distanceText = (activeTrip.total_distance && Number(activeTrip.total_distance) > 0)
-    ? `${Number(activeTrip.total_distance).toFixed(2)} km`
-    : (activeTrip.estimated_distance_km && Number(activeTrip.estimated_distance_km) > 0)
-    ? `${Number(activeTrip.estimated_distance_km).toFixed(2)} km`
+  // Distance computation (strictly from real hardware GPS sensor or real route breadcrumbs, zero guessing)
+  const realDist = calculateRealTripDistance(activeTrip);
+  const distanceText = realDist > 0
+    ? `${realDist.toFixed(2)} km`
     : isOngoing
     ? 'Calculating...'
-    : '--- km';
+    : '0.00 km';
 
   // Battery computation & drain calculation
   const startBat = activeTrip.start_battery_level != null ? Number(activeTrip.start_battery_level) : null;
@@ -259,7 +243,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
               mobileTab === 'info' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span className="material-icons text-sm">assessment</span> Telemetry & Info
+            <span className="material-icons text-sm">assessment</span> Trip & Status Info
           </button>
           <button
             onClick={onClose}
@@ -278,7 +262,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
           <div className="px-4 py-2.5 border-b border-slate-200 bg-white flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <span className="material-icons text-blue-600 text-lg">route</span>
-              <h2 className="font-bold text-slate-800 text-xs sm:text-sm truncate">Trip Telemetry</h2>
+              <h2 className="font-bold text-slate-800 text-xs sm:text-sm truncate">Trip Details</h2>
               <span 
                 className="text-[9.5px] font-mono text-slate-600 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded border border-slate-200 uppercase tracking-wider cursor-pointer transition-colors shrink-0"
                 title="Click to copy tracking code"
@@ -491,10 +475,10 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
                 <div className="flex items-center justify-between border-b border-amber-200/60 pb-1">
                   <h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1">
                     <span className="material-icons text-xs text-amber-600">graphic_eq</span>
-                    Audio Blackbox Recording
+                    Emergency Audio Recording
                   </h3>
                   <span className="text-[9px] font-mono font-bold bg-amber-200/70 text-amber-900 px-1.5 py-0.5 rounded uppercase">
-                    EVIDENCE CLOUD
+                    SAVED AUDIO
                   </span>
                 </div>
 
@@ -509,7 +493,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
                 </div>
 
                 <div className="flex justify-between items-center text-[9.5px] font-mono text-amber-900/80 pt-0.5">
-                  <span>Streamed from Cloudinary</span>
+                  <span>Saved in Cloud Storage</span>
                   <a 
                     href={activeTrip.audio_clip_url}
                     target="_blank"
@@ -524,22 +508,22 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
               </div>
             )}
 
-            {/* Forensic SOS Timeline Card */}
+            {/* Emergency SOS Timeline Card */}
             {(isSos || sosActivityLogs.length > 0 || activeTrip.sos_triggered_at) && (
               <div className="bg-rose-50/60 p-2.5 rounded-xl border border-rose-200 shadow-2xs space-y-2">
                 <div className="flex items-center justify-between border-b border-rose-200 pb-1">
                   <h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1">
                     <span className="material-icons text-xs text-rose-600">security</span>
-                    Forensic SOS Audit Log
+                    Emergency SOS Timeline
                   </h3>
                   <span className="text-[9px] font-mono font-bold bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded uppercase">
-                    {isSos ? 'ACTIVE CRISIS' : 'RECORDED'}
+                    {isSos ? 'EMERGENCY ACTIVE' : 'RESOLVED'}
                   </span>
                 </div>
 
                 {sosActivityLogs.length === 0 ? (
                   <div className="text-[11px] text-rose-700 space-y-1">
-                    <p className="font-semibold">SOS Panic protocol initiated.</p>
+                    <p className="font-semibold">Emergency SOS alert triggered.</p>
                     <p className="text-[9.5px] font-mono text-rose-600">
                       Triggered at: {activeTrip.sos_triggered_at ? new Date(activeTrip.sos_triggered_at).toLocaleTimeString() : 'Trip active'}
                     </p>

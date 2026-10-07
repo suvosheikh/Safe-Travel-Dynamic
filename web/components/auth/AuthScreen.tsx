@@ -230,7 +230,7 @@ export default function AuthScreen({ onAuthSuccess, dbProfiles, onUpdateProfiles
             SafeTravel <span className="text-blue-500 font-bold">Pro</span>
           </h1>
           <p className="text-[10px] text-slate-500 tracking-widest font-mono uppercase mt-1">
-            Secure Terminal Control Panel
+            Safety Dashboard & Portal
           </p>
         </div>
 
@@ -384,12 +384,12 @@ export default function AuthScreen({ onAuthSuccess, dbProfiles, onUpdateProfiles
             {isLoading ? (
               <>
                 <span className="material-icons animate-spin text-sm">autorenew</span>
-                <span>AUTHENTICATING SECURE LOCK...</span>
+                <span>{isSignUp ? 'CREATING ACCOUNT...' : 'SIGNING IN...'}</span>
               </>
             ) : (
               <>
                 <span className="material-icons text-sm">{isSignUp ? 'person_add' : 'lock_open'}</span>
-                <span className="uppercase tracking-wider">{isSignUp ? 'CREATE TERMINAL ACCOUNT' : 'SECURE TERMINAL ACCESS'}</span>
+                <span className="uppercase tracking-wider">{isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN'}</span>
               </>
             )}
           </button>
@@ -397,7 +397,7 @@ export default function AuthScreen({ onAuthSuccess, dbProfiles, onUpdateProfiles
           {/* Toggle Screen Mode */}
           <div className="pt-4 border-t border-slate-900 flex justify-center text-[11px]">
             <span className="text-slate-500 mr-1">
-              {isSignUp ? 'Already registered on terminal?' : 'Need to enroll dispatcher/admin?'}
+              {isSignUp ? 'Already have an account?' : 'Need to create an account?'}
             </span>
             <button
               type="button"
@@ -408,7 +408,7 @@ export default function AuthScreen({ onAuthSuccess, dbProfiles, onUpdateProfiles
               }}
               className="text-blue-400 font-semibold hover:underline cursor-pointer"
             >
-              {isSignUp ? 'Log In Instead' : 'Register Profile'}
+              {isSignUp ? 'Log In Instead' : 'Register Here'}
             </button>
           </div>
         </form>
@@ -417,7 +417,7 @@ export default function AuthScreen({ onAuthSuccess, dbProfiles, onUpdateProfiles
         <div className="p-3 bg-slate-950 border-t border-slate-900 flex items-center justify-center space-x-2 text-[9px] font-mono text-slate-500">
           <span className={`w-2 h-2 rounded-full ${supabaseActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-pulse'}`}></span>
           <span className="uppercase tracking-widest">
-            {supabaseActive ? 'Supabase cloud cloud auth client active' : 'Local sandboxed database sandbox active'}
+            {supabaseActive ? 'Secure cloud connection active' : 'Local database connection active'}
           </span>
         </div>
       </motion.div>
