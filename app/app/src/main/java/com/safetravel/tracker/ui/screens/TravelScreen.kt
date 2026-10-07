@@ -402,7 +402,7 @@ fun TravelScreenContent(
     }
 
     LaunchedEffect(Unit) {
-        while (kotlinx.coroutines.isActive) {
+        while (true) {
             currentBatteryLevel = com.safetravel.tracker.util.BatteryHelper.getCurrentBatteryLevel(context)
             kotlinx.coroutines.delay(10_000L)
         }
