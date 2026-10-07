@@ -794,7 +794,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             }.onFailure { ex ->
                 android.util.Log.e("SafeTravel", "Remote startTrip failed, falling back to Offline Mode", ex)
                 val offlineId = "OFFLINE-" + UUID.randomUUID().toString().take(8).uppercase()
-                val offlineTrip = com.safetravel.tracker.model.SupabaseTrip(
+                val offlineTrip = SupabaseTrip(
                     id = offlineId,
                     userId = profile.id,
                     startAddress = cleanStart,
@@ -809,7 +809,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                     createdAt = SupabaseManager.getIsoInstantString(),
                     vehiclePlateNumber = vehicle,
                     vehicleDescription = vehicleDesc,
-                    routePathLog = emptyList(),
+                    routePathLog = emptyList<Map<String, Double>>(),
                     plannedRouteLog = if (plannedRoute.isNotEmpty()) plannedRoute else null,
                     totalDistance = estimatedDistanceKm,
                     estimatedDistanceKm = estimatedDistanceKm,

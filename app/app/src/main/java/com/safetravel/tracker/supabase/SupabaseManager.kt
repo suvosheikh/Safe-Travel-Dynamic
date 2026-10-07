@@ -417,7 +417,7 @@ object SupabaseManager {
         return Result.success(updated)
     }
 
-    private fun getIsoInstantString(): String {
+    fun getIsoInstantString(): String {
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
         sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
         return sdf.format(java.util.Date())
@@ -973,7 +973,6 @@ object SupabaseManager {
             } catch (e: Exception) { return Result.failure(e) }
         }
         mockGuardians.removeAll { it.id == id }
-        saveGuardianSync()
         return Result.success(Unit)
     }
 
