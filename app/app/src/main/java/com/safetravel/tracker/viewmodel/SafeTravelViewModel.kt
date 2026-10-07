@@ -1315,7 +1315,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                     if (it.id == tipId) it.copy(isRead = true) else it
                 }
                 safetyTips.value = updatedList
-                actionFeedbackMessage.value = "Tip marked as read! ✅"
+                actionFeedbackMessage.value = "Tip marked as read!"
             }
         }
     }

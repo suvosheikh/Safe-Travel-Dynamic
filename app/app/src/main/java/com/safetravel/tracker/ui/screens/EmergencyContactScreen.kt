@@ -47,6 +47,7 @@ fun EmergencyContactScreen(vm: SafeTravelViewModel, onBack: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val hotlines by vm.hotlines.collectAsState()
     val guardians by vm.userGuardians.collectAsState()
+    val profile by vm.userProfile.collectAsState()
     val searchQuery by vm.emergencySearchQuery.collectAsState()
     val currentLocationName by vm.currentLocationName.collectAsState()
     val currentPosition by vm.currentPosition.collectAsState()
@@ -54,6 +55,8 @@ fun EmergencyContactScreen(vm: SafeTravelViewModel, onBack: () -> Unit) {
     val haptic = LocalHapticFeedback.current
 
     var selectedHotline by remember { mutableStateOf<SupabaseHotline?>(null) }
+    var showAddGuardianSheet by remember { mutableStateOf(false) }
+    var selectedGuardianToEdit by remember { mutableStateOf<Guardian?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(Unit) {
@@ -162,6 +165,36 @@ fun EmergencyContactScreen(vm: SafeTravelViewModel, onBack: () -> Unit) {
                 )
             }
 
+            if (selectedTab == 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Personal Guardians (${filteredGuardians.size})",
+                        color = Slate300,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Button(
+                        onClick = {
+                            selectedGuardianToEdit = null
+                            showAddGuardianSheet = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add Guardian", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
             // 3. ANIMATED CONTENT
             AnimatedContent(
                 targetState = selectedTab,
@@ -205,7 +238,14 @@ fun EmergencyContactScreen(vm: SafeTravelViewModel, onBack: () -> Unit) {
                             }
                         } else {
                             if (filteredGuardians.isEmpty()) {
-                                item { EmptyGuardiansView() }
+                                item {
+                                    EmptyGuardiansView(
+                                        onAddClick = {
+                                            selectedGuardianToEdit = null
+                                            showAddGuardianSheet = true
+                                        }
+                                    )
+                                }
                             } else {
                                 items(filteredGuardians) { guardian ->
                                     GuardianCard(guardian, currentPosition)
@@ -216,14 +256,51 @@ fun EmergencyContactScreen(vm: SafeTravelViewModel, onBack: () -> Unit) {
                 }
             }
         }
+
+        // 4. FLOATING ACTION BUTTON FOR PERSONAL GUARDIANS TAB
+        if (selectedTab == 1) {
+            FloatingActionButton(
+                onClick = {
+                    selectedGuardianToEdit = null
+                    showAddGuardianSheet = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(bottom = 90.dp, end = 20.dp),
+                containerColor = Color(0xFF3B82F6),
+                contentColor = Color.White,
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add Guardian", modifier = Modifier.size(26.dp))
+            }
+        }
     }
 
-    // 4. OFFICIAL HOTLINE BOTTOM SHEET
+    // 5. OFFICIAL HOTLINE BOTTOM SHEET
     if (selectedHotline != null) {
         OfficialHotlineBottomSheet(
             hotline = selectedHotline!!,
             sheetState = sheetState,
             onDismiss = { selectedHotline = null }
+        )
+    }
+
+    // 6. ADD GUARDIAN BOTTOM SHEET
+    if (showAddGuardianSheet) {
+        val currentUserId = profile?.id ?: vm.userProfile.value?.id ?: ""
+        AddGuardianBottomSheet(
+            guardian = selectedGuardianToEdit,
+            onDismiss = { showAddGuardianSheet = false },
+            onSave = { guardian ->
+                vm.saveGuardianToSupabase(guardian)
+                showAddGuardianSheet = false
+            },
+            onDelete = { guardianId ->
+                vm.deleteGuardian(guardianId)
+                showAddGuardianSheet = false
+            },
+            userId = currentUserId
         )
     }
 }
@@ -592,12 +669,12 @@ fun OfficialHotlineBottomSheet(
 }
 
 @Composable
-fun EmptyGuardiansView() {
+fun EmptyGuardiansView(onAddClick: () -> Unit = {}) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(Icons.Default.GroupAdd, contentDescription = null, tint = Slate700, modifier = Modifier.size(64.dp))
+        Icon(Icons.Default.GroupAdd, contentDescription = null, tint = Slate600, modifier = Modifier.size(64.dp))
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "No Personal Guardians Found",
@@ -605,11 +682,22 @@ fun EmptyGuardiansView() {
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "Add your trusted contacts from the 'Profile' tab to notify them during emergencies.",
+            text = "Add your trusted family or friends to automatically notify them with your live location during emergencies.",
             color = Slate400,
             fontSize = 12.sp,
             textAlign = TextAlign.Center
         )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = onAddClick,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Add Guardian", color = Color.White, fontWeight = FontWeight.Bold)
+        }
     }
 }

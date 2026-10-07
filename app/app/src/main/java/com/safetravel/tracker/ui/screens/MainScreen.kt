@@ -754,7 +754,10 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                         SafetyTipDetailScreen(
                             tip = selectedTip!!,
                             onBack = { selectedTip = null },
-                            onMarkAsRead = { vm.markTipAsRead(it) }
+                            onMarkAsRead = {
+                                vm.markTipAsRead(it)
+                                selectedTip = selectedTip?.copy(isRead = true)
+                            }
                         )
                     } else if (showSafetyTips) {
                         SafetyTipsScreen(
