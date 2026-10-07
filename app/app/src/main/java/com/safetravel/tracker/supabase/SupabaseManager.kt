@@ -496,7 +496,7 @@ object SupabaseManager {
                 val code = response?.code()
                 val errBody = response?.errorBody()?.string() ?: "No error body"
                 android.util.Log.e("SupabaseManager", "Remote startTrip failed. HTTP Code: $code, Error: $errBody")
-                return Result.failure(Exception("Supabase failed ($code): $errBody"))
+                return Result.failure(Exception("Unable to start journey on server. Please check your internet connection."))
             } catch (e: Exception) { 
                 android.util.Log.e("SupabaseManager", "Remote startTrip exception: ${e.localizedMessage}", e)
                 return Result.failure(e)
@@ -562,7 +562,7 @@ object SupabaseManager {
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
                 android.util.Log.e("SupabaseManager", "Remote endTrip failed. HTTP Code: $code, Error: $errBody")
-                return Result.failure(Exception("Supabase endTrip failed ($code): $errBody"))
+                return Result.failure(Exception("Unable to complete journey on server. Please check your connection."))
             } catch (e: Exception) { 
                 android.util.Log.e("SupabaseManager", "Remote endTrip exception: ${e.localizedMessage}", e)
                 return Result.failure(e)
@@ -697,10 +697,10 @@ object SupabaseManager {
                 if (resp?.isSuccessful == true && resp.body() != null) return Result.success(resp.body()!!)
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase SOS fetch failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to fetch SOS records."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        return Result.success(mockSosRecords)
+        return Result.success(emptyList())
     }
 
     suspend fun getLiveHomepageBanners(): Result<List<SupabaseHomepageBanner>> {
@@ -711,10 +711,10 @@ object SupabaseManager {
                 if (resp?.isSuccessful == true && resp.body() != null) return Result.success(resp.body()!!)
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase Banners fetch failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to fetch banners."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        return Result.success(mockHomepageBanners)
+        return Result.success(emptyList())
     }
 
     suspend fun getSafetyNews(): Result<List<SupabaseSafetyNews>> {
@@ -725,10 +725,10 @@ object SupabaseManager {
                 if (resp?.isSuccessful == true && resp.body() != null) return Result.success(resp.body()!!)
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase News fetch failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to fetch news."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        return Result.success(mockSafetyNews)
+        return Result.success(emptyList())
     }
 
     suspend fun fetchUserTrips(userId: String): Result<List<SupabaseTrip>> {
@@ -747,7 +747,7 @@ object SupabaseManager {
                 }
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase Trips fetch failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to fetch journeys."))
             } catch (e: Exception) { 
                 Log.w(TAG, "Failed to fetch remote trips, loading local Room trips: ${e.localizedMessage}")
             }
@@ -769,8 +769,7 @@ object SupabaseManager {
             }
         } ?: emptyList()
 
-        val combined = (mockTrips + localTrips).distinctBy { it.id }.filter { it.userId == userId }
-        return Result.success(combined)
+        return Result.success(localTrips.filter { it.userId == userId })
     }
 
     suspend fun logPoints(userId: String, points: Int, source: String): Result<SupabasePointsLog> {
@@ -780,11 +779,10 @@ object SupabaseManager {
                 if (resp?.isSuccessful == true && !resp.body().isNullOrEmpty()) return Result.success(resp.body()!!.first())
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase logPoints failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to record loyalty points."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        val l = SupabasePointsLog(id = "PL-" + UUID.randomUUID().toString().take(6), userId = userId, pointsAdded = points, source = source, timestamp = "Now")
-        mockPointsLogs.add(0, l); return Result.success(l)
+        return Result.failure(Exception("Database connection unavailable."))
     }
 
     // Remote Configs Cache & Helper for Dynamic Point Control
@@ -814,12 +812,12 @@ object SupabaseManager {
                 }
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase fetchPointsLogs failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to fetch points history."))
             } catch (e: Exception) {
                 return Result.failure(e)
             }
         }
-        return Result.success(mockPointsLogs.filter { it.userId == userId })
+        return Result.success(emptyList())
     }
 
     suspend fun redeemPoints(
@@ -872,10 +870,10 @@ object SupabaseManager {
                 }
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase Audio Logs fetch failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to fetch audio logs."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        return Result.success(mockSafetyAudioLogs.filter { it.userId == userId && it.isDeletedByUser != true })
+        return Result.success(emptyList())
     }
 
     suspend fun softDeleteSafetyAudioLog(logId: String): Result<Boolean> {
@@ -891,24 +889,16 @@ object SupabaseManager {
             try {
                 val resp = dbService?.updateSafetyAudioLog("eq.$logId", body, "Bearer $currentSessionToken")
                 if (resp?.isSuccessful == true) {
-                    val idx = mockSafetyAudioLogs.indexOfFirst { it.id == logId }
-                    if (idx != -1) {
-                        mockSafetyAudioLogs[idx] = mockSafetyAudioLogs[idx].copy(isDeletedByUser = true, userDeletedAt = nowIso)
-                    }
                     return Result.success(true)
                 }
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase softDeleteSafetyAudioLog failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to delete audio log."))
             } catch (e: Exception) {
                 return Result.failure(e)
             }
         }
-        val idx = mockSafetyAudioLogs.indexOfFirst { it.id == logId }
-        if (idx != -1) {
-            mockSafetyAudioLogs[idx] = mockSafetyAudioLogs[idx].copy(isDeletedByUser = true, userDeletedAt = nowIso)
-        }
-        return Result.success(true)
+        return Result.failure(Exception("Database connection unavailable."))
     }
 
     suspend fun createSafetyAudioLog(
@@ -939,29 +929,14 @@ object SupabaseManager {
                 val resp = dbService?.createSafetyAudioLog(body, "Bearer $currentSessionToken")
                 if (resp?.isSuccessful == true && !resp.body().isNullOrEmpty()) {
                     val created = resp.body()!!.first()
-                    mockSafetyAudioLogs.add(0, created)
                     return Result.success(created)
                 }
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase createSafetyAudioLog failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to save audio log."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        val mock = SupabaseSafetyAudioLog(
-            id = UUID.randomUUID().toString(),
-            userId = userId,
-            tripId = tripId,
-            audioUrl = audioUrl,
-            cloudinaryPublicId = cloudinaryPublicId,
-            durationSec = durationSec,
-            fileSizeBytes = fileSizeBytes,
-            recordedAddress = recordedAddress,
-            recordedCoords = recordedCoords,
-            sourceTrigger = sourceTrigger,
-            createdAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).format(java.util.Date())
-        )
-        mockSafetyAudioLogs.add(0, mock)
-        return Result.success(mock)
+        return Result.failure(Exception("Database connection unavailable."))
     }
 
     suspend fun fetchGuardians(userId: String): Result<List<Guardian>> {
@@ -971,20 +946,10 @@ object SupabaseManager {
                 if (resp?.isSuccessful == true) return Result.success(resp.body() ?: emptyList())
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase Guardians fetch failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to fetch guardians."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        return Result.success(mockGuardians.filter { it.userId == userId })
-    }
-
-    fun saveGuardianSync() {
-        try {
-            val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Guardian::class.java)
-            val json = SupabaseClient.moshi.adapter<List<Guardian>>(listType).toJson(mockGuardians)
-            SupabaseClient.sharedPrefs?.edit()?.putString("mock_guardians_json", json)?.apply()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save guardians", e)
-        }
+        return Result.success(emptyList())
     }
 
     suspend fun saveGuardian(guardian: Guardian): Result<Guardian> {
@@ -994,13 +959,10 @@ object SupabaseManager {
                 if (resp?.isSuccessful == true && !resp.body().isNullOrEmpty()) return Result.success(resp.body()!!.first())
                 val code = resp?.code()
                 val errBody = resp?.errorBody()?.string() ?: "No error body"
-                return Result.failure(Exception("Supabase Guardian save failed ($code): $errBody"))
+                return Result.failure(Exception("Failed to save guardian."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        mockGuardians.removeAll { it.id == guardian.id }
-        mockGuardians.add(0, guardian)
-        saveGuardianSync()
-        return Result.success(guardian)
+        return Result.failure(Exception("Database connection unavailable."))
     }
 
     suspend fun deleteGuardian(id: String): Result<Unit> {
@@ -1246,8 +1208,7 @@ object SupabaseManager {
                 return Result.success(populatedShares)
             } catch (e: Exception) { return Result.failure(e) }
         }
-        val targetUid = explicitUserId ?: currentUserId
-        return Result.success(mockTripShares.filter { it.sharedWithPhone == phone || (targetUid != null && it.sharedWithUserId == targetUid) })
+        return Result.success(emptyList())
     }
 
     suspend fun fetchTripById(tripId: String): Result<SupabaseTrip> {
@@ -1255,11 +1216,10 @@ object SupabaseManager {
             try {
                 val resp = dbService?.getTripById("eq.$tripId", currentAuthHeader)
                 if (resp?.isSuccessful == true && !resp.body().isNullOrEmpty()) return Result.success(resp.body()!!.first())
-                return Result.failure(Exception("Trip not found"))
+                return Result.failure(Exception("Trip record not found."))
             } catch (e: Exception) { return Result.failure(e) }
         }
-        val t = mockTrips.find { it.id == tripId }
-        return if (t != null) Result.success(t) else Result.failure(Exception("Trip not found"))
+        return Result.failure(Exception("Database connection unavailable."))
     }
 
     // --- REMOTE CONFIG ARCHITECTURE (Mapbox, Cloudinary, etc.) ---
@@ -1365,7 +1325,7 @@ object SupabaseManager {
                 return Result.failure(e)
             }
         }
-        return Result.failure(Exception("Supabase is not configured."))
+        return Result.failure(Exception("Payment service is currently unavailable."))
     }
 
     suspend fun fetchVersionLogs(): Result<List<SupabaseVersionLog>> {

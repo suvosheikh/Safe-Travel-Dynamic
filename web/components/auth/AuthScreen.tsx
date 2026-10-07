@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { getSupabaseClient, hasSupabaseConfig, Profile } from '../../lib/supabase';
+import { useToast } from '../ui/Toast';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: { email: string; role: 'admin' | 'dispatcher' | 'user'; name: string; id: string }) => void;
@@ -11,6 +12,7 @@ interface AuthScreenProps {
 }
 
 export default function AuthScreen({ onAuthSuccess, dbProfiles, onUpdateProfiles }: AuthScreenProps) {
+  const { toast } = useToast();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -351,7 +353,7 @@ export default function AuthScreen({ onAuthSuccess, dbProfiles, onUpdateProfiles
               {!isSignUp && (
                 <button
                   type="button"
-                  onClick={() => alert('For local simulated accounts, use: \n- admin@safetravel.com / adminpassword\n- dispatcher@safetravel.com / dispatcherpassword')}
+                  onClick={() => toast.info('Admin: admin@safetravel.com / adminpassword\nDispatcher: dispatcher@safetravel.com / dispatcherpassword', 'Demo System Credentials', 7000)}
                   className="text-[9px] font-sans text-blue-400 hover:underline cursor-pointer"
                 >
                   Need access?

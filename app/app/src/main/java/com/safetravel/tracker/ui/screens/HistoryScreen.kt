@@ -222,7 +222,7 @@ fun HistoryScreen(vm: SafeTravelViewModel) {
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                     Text(
-                        text = "High-compressed encrypted audio clips synchronized to Cloudinary & Supabase.",
+                        text = "High-compressed encrypted audio clips synchronized securely to cloud storage.",
                         fontSize = 12.sp,
                         color = Slate400,
                         modifier = Modifier.padding(bottom = 16.dp)

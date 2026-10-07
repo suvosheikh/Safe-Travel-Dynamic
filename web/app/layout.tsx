@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import {Inter, JetBrains_Mono} from 'next/font/google';
 import { LanguageProvider } from '@/components/LanguageProvider';
+import { ToastProvider } from '@/components/ui/Toast';
 import './globals.css';
 
 const inter = Inter({
@@ -35,7 +36,9 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
       </head>
       <body className="font-sans antialiased bg-slate-50 text-slate-900" suppressHydrationWarning>
         <LanguageProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </LanguageProvider>
       </body>
     </html>

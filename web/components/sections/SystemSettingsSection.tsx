@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getSupabaseClient } from '../../lib/supabase';
+import { useToast } from '../ui/Toast';
 
 interface SystemSettingsSectionProps {
   // Optional database / sync callback if needed in future
@@ -9,6 +10,7 @@ interface SystemSettingsSectionProps {
 }
 
 export default function SystemSettingsSection({ onSettingsSaved }: SystemSettingsSectionProps) {
+  const { toast } = useToast();
   // Load settings from localStorage if available, or use defaults
   const [settings, setSettings] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -197,11 +199,13 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
 
       setVersionSaveMessage("Version log saved successfully!");
       setIsVersionModalOpen(false);
+      toast.success("Version log published and available across mobile apps.", "Version Saved");
       await loadVersionLogs();
       setTimeout(() => setVersionSaveMessage(null), 3000);
     } catch (err: any) {
       console.error("Failed to save version log:", err);
       setVersionSaveMessage(`Error: ${err.message || 'Failed to save version'}`);
+      toast.error(`Failed to save version log: ${err.message || 'Error occurred'}`, "Save Error");
     } finally {
       setIsSavingVersion(false);
     }
@@ -217,9 +221,10 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
         .delete()
         .eq('id', id);
       if (error) throw error;
+      toast.success(`Version log v${ver} removed successfully.`, "Version Removed");
       await loadVersionLogs();
     } catch (err: any) {
-      alert(`Failed to delete version log: ${err.message}`);
+      toast.error(`Failed to delete version log: ${err.message}`, "Deletion Failed");
     }
   };
 
@@ -266,10 +271,12 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
 
       if (error) throw error;
       setCloudSaveMessage("Successfully updated Supabase app_remote_configs!");
+      toast.success("Mobile remote parameters synced to cloud.", "Remote Configs Saved");
       setTimeout(() => setCloudSaveMessage(null), 4000);
     } catch (e: any) {
       console.error("Failed to save remote configs:", e);
       setCloudSaveMessage(`Error: ${e.message || 'Failed to save to Supabase'}`);
+      toast.error(`Failed to save remote configs: ${e.message || 'Error occurred'}`, "Sync Error");
     } finally {
       setIsSavingCloud(false);
     }
@@ -281,12 +288,11 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
     setTimeout(() => {
       localStorage.setItem('safetravel_settings', JSON.stringify(updatedSettings));
       setIsSaving(false);
-      setShowSaveToast(true);
+      toast.success("System preferences and configurations saved.", "Settings Saved");
       if (onSettingsSaved) {
         onSettingsSaved(updatedSettings);
       }
-      setTimeout(() => setShowSaveToast(false), 3000);
-    }, 600);
+    }, 400);
   };
 
   const handleToggle = (key: string) => {
@@ -325,23 +331,6 @@ export default function SystemSettingsSection({ onSettingsSaved }: SystemSetting
           <span>ALL PREFERENCES AUTOMATICALLY SAVED TO CLOUD</span>
         </div>
       </div>
-
-      {/* Save Notification Toast */}
-      {showSaveToast && (
-        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-4 py-3 rounded-xl flex items-center justify-between animate-fadeIn text-xs font-medium" id="settings-save-toast">
-          <div className="flex items-center space-x-2">
-            <span className="material-icons text-base text-emerald-600">check_circle</span>
-            <span>Settings updated successfully. Your preferences are saved.</span>
-          </div>
-          <button 
-            type="button" 
-            onClick={() => setShowSaveToast(false)}
-            className="text-emerald-500 hover:text-emerald-800 font-bold"
-          >
-            <span className="material-icons text-xs">close</span>
-          </button>
-        </div>
-      )}
 
       {/* Main Settings Panel Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start" id="settings-grid">

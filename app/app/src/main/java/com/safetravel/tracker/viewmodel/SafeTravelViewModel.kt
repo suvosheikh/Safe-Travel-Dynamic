@@ -21,6 +21,7 @@ import com.safetravel.tracker.util.AddressUtils
 import com.safetravel.tracker.util.DateTimeUtils
 import com.safetravel.tracker.util.LocationHelper
 import com.safetravel.tracker.util.AdaptiveLocationFilter
+import com.safetravel.tracker.util.SafeErrorFormatter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -588,7 +589,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                         actionFeedbackMessage.value = "Account created successfully!"
                         refreshData()
                     }.onFailure { exception ->
-                        actionFeedbackMessage.value = exception.localizedMessage ?: "Sign Up failed. Please try again."
+                        actionFeedbackMessage.value = SafeErrorFormatter.format(exception, "Sign Up failed. Please try again.")
                     }
                 } else {
                     // Sign In Route (Authenticates with Supabase base password or retrieves local sandbox mock profile)
@@ -598,7 +599,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                         actionFeedbackMessage.value = "Signed in successfully!"
                         refreshData()
                     }.onFailure { exception ->
-                        actionFeedbackMessage.value = exception.localizedMessage ?: "Invalid login credentials."
+                        actionFeedbackMessage.value = SafeErrorFormatter.format(exception, "Invalid login credentials.")
                     }
                 }
             } finally {
@@ -790,9 +791,49 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                 }
 
                 refreshData()
-            }.onFailure {
-                android.util.Log.e("SafeTravel", "Failed to start trip", it)
-                actionFeedbackMessage.value = "Error: ${it.localizedMessage}"
+            }.onFailure { ex ->
+                android.util.Log.e("SafeTravel", "Remote startTrip failed, falling back to Offline Mode", ex)
+                val offlineId = "OFFLINE-" + UUID.randomUUID().toString().take(8).uppercase()
+                val offlineTrip = com.safetravel.tracker.model.SupabaseTrip(
+                    id = offlineId,
+                    userId = profile.id,
+                    startAddress = cleanStart,
+                    endAddress = cleanEnd,
+                    startCoords = startCoordsStr,
+                    endCoords = endCoordsStr,
+                    transportMode = modeStr,
+                    startBatteryLevel = battery,
+                    endBatteryLevel = battery,
+                    deviceModel = deviceModel,
+                    status = "ongoing",
+                    createdAt = SupabaseManager.getIsoInstantString(),
+                    vehiclePlateNumber = vehicle,
+                    vehicleDescription = vehicleDesc,
+                    routePathLog = emptyList(),
+                    plannedRouteLog = if (plannedRoute.isNotEmpty()) plannedRoute else null,
+                    totalDistance = estimatedDistanceKm,
+                    estimatedDistanceKm = estimatedDistanceKm,
+                    estimatedDurationMin = estimatedDurationMin,
+                    trackingCode = "TRK-" + (1000..9999).random(),
+                    notifiedGuardians = sharedPhones
+                )
+                try {
+                    database.safeTravelDao().insertTrip(offlineTrip.toOffline())
+                } catch (dbErr: Exception) {
+                    android.util.Log.e("SafeTravel", "Failed to save offline trip to Room DB", dbErr)
+                }
+                activeTrip.value = offlineTrip
+                vehiclePhotoUrl.value = null
+                val initialPath = if (startCoordsPair.first != 0.0 && startCoordsPair.second != 0.0) {
+                    listOf(mapOf("lat" to startCoordsPair.first, "lng" to startCoordsPair.second))
+                } else {
+                    emptyList()
+                }
+                activeRoutePath.value = initialPath
+                com.safetravel.tracker.util.ActiveTripTrailCache.saveTrail(getApplication(), offlineId, initialPath)
+                adaptiveLocationFilter.reset()
+                actionFeedbackMessage.value = "Journey started in Offline Safety Mode. Coordinates saved locally."
+                refreshData()
             }
             isLoading.value = false
         }
@@ -917,7 +958,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                 syncProfile()
                 refreshData()
             }.onFailure {
-                actionFeedbackMessage.value = "Error completing trip: ${it.localizedMessage}"
+                actionFeedbackMessage.value = "Error completing trip: ${SafeErrorFormatter.format(it)}"
             }
             isLoading.value = false
         }
@@ -1038,8 +1079,8 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             val result = SupabaseManager.updateProfileFields(profile.id, mapOf("is_premium" to nextState))
             result.onSuccess { updated ->
                 userProfile.value = updated
-                actionFeedbackMessage.value = if (nextState) "Premium Vault Enforcer Activated! 💎" else "Premium state configured off."
-}
+                actionFeedbackMessage.value = if (nextState) "Premium Vault Enforcer Activated!" else "Premium state configured off."
+            }
         }
     }
 
@@ -1048,12 +1089,12 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             val result = SupabaseManager.updateProfileFields(userId, updates)
             result.onSuccess { updated ->
                 userProfile.value = updated
-                actionFeedbackMessage.value = "Profile metrics synchronized. 🛡️"
-}
+                actionFeedbackMessage.value = "Profile metrics synchronized."
+            }
             result.onFailure { exception ->
-                actionFeedbackMessage.value = "Error: ${exception.localizedMessage}"
+                actionFeedbackMessage.value = SafeErrorFormatter.format(exception)
                 android.util.Log.e("SafeTravelViewModel", "Update failed", exception)
-}
+            }
         }
     }
 
@@ -1079,8 +1120,8 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             val result = SupabaseManager.saveGuardian(guardian)
             result.onSuccess {
                 refreshGuardians()
-                actionFeedbackMessage.value = "Guardian Added Successfully! 🛡️"
-}
+                actionFeedbackMessage.value = "Guardian added successfully."
+            }
         }
     }
 
@@ -1090,10 +1131,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             SupabaseManager.fetchGuardians(currentId).onSuccess { list ->
                 userGuardians.value = list
             }.onFailure {
-                // If offline/error and list is empty, supply mock guardians
-                if (userGuardians.value.isEmpty()) {
-                    userGuardians.value = SupabaseManager.mockGuardians
-                }
+                // Honest empty state: no mock guardians
             }
         }
     }
@@ -1103,7 +1141,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             SupabaseManager.deleteGuardian(id).onSuccess {
                 refreshGuardians()
                 actionFeedbackMessage.value = "Guardian record purged."
-}
+            }
         }
     }
 
@@ -1111,7 +1149,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         val profile = userProfile.value ?: return
         viewModelScope.launch {
             SupabaseManager.shareTrip(tripId, profile.id, phones).onSuccess {
-                actionFeedbackMessage.value = "Trip shared with selected guardians! 🛡️"
+                actionFeedbackMessage.value = "Trip shared with selected guardians."
             }
         }
     }
@@ -1132,7 +1170,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                         val newest = newActive.first()
                         val sharerName = newest.sharedByProfile?.fullName ?: "Someone close to you"
                         activeHeadsUpAlert.value = HeadsUpAlert(
-                            title = "🚨 New Trip Alert!",
+                            title = "New Trip Alert",
                             message = "$sharerName has started a trip and shared their live tracking with you.",
                             tripId = newest.tripId,
                             trackingCode = newest.tripDetails?.trackingCode ?: ""
@@ -1148,7 +1186,6 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         val localTrip = incomingTripShares.value.find { it.tripId == tripId }?.tripDetails
             ?: pastTrips.value.find { it.id == tripId }
             ?: activeTrip.value?.takeIf { it.id == tripId }
-            ?: SupabaseManager.mockTrips.find { it.id == tripId }
 
         if (localTrip != null) {
             selectedSharedTrip.value = localTrip
@@ -1453,7 +1490,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                         }
                     }
 
-                    actionFeedbackMessage.value = "🎙️ Audio Blackbox secured & uploaded to vault!"
+                    actionFeedbackMessage.value = "Audio Blackbox secured and uploaded to vault."
                     refreshSafetyAudioLogs()
                 } else {
                     actionFeedbackMessage.value = "Audio saved locally on device."
@@ -1577,11 +1614,11 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             )
             val result = SupabaseManager.submitFeedback(feedback)
             result.onSuccess {
-                actionFeedbackMessage.value = "Feedback shared with engineering! 🚀"
+                actionFeedbackMessage.value = "Feedback shared with engineering team."
                 onSuccess()
-}.onFailure {
-                actionFeedbackMessage.value = "Failed to send feedback: ${it.localizedMessage}"
-}
+            }.onFailure {
+                actionFeedbackMessage.value = "Failed to send feedback: ${SafeErrorFormatter.format(it)}"
+            }
             isLoading.value = false
         }
     }

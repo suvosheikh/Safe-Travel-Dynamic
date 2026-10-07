@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { getSupabaseClient } from '../../lib/supabase';
+import { useToast } from '../ui/Toast';
 
 export default function AdMonetizationSection() {
+  const { toast } = useToast();
   const [activeNetworkTab, setActiveNetworkTab] = useState<'admob' | 'meta'>('admob');
 
   // Cloud Remote Configs State for Ads Monetization
@@ -82,10 +84,12 @@ export default function AdMonetizationSection() {
 
       if (error) throw error;
       setCloudSaveMessage('Successfully updated Supabase app_remote_configs!');
+      toast.success('Ad monetization remote parameters synced to cloud.', 'Monetization Saved');
       setTimeout(() => setCloudSaveMessage(null), 4000);
     } catch (e: any) {
       console.error('Failed to save ads remote configs:', e);
       setCloudSaveMessage(`Error: ${e.message || 'Failed to save to Supabase'}`);
+      toast.error(`Failed to save ad configs: ${e.message || 'Error occurred'}`, 'Sync Error');
     } finally {
       setIsSavingCloud(false);
     }

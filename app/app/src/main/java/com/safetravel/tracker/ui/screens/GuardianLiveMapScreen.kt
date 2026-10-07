@@ -178,8 +178,8 @@ fun GuardianLiveMapScreen(vm: SafeTravelViewModel, tripId: String, onBack: () ->
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = if (activeTripDetails?.status == "sos") "🚨 RED ALERT ACTIVE" else if (activeTripDetails != null) "Live GPS Beacon Active" else "Connecting to Beacon...",
-                            color = Color.White,
+                            text = if (activeTripDetails?.status == "sos") "RED ALERT ACTIVE" else if (activeTripDetails != null) "Live GPS Beacon Active" else "Connecting to Beacon...",
+                            color = if (activeTripDetails?.status == "sos") Color(0xFFEF4444) else Color.White,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 0.5.sp

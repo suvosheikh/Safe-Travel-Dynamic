@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { TravelActivity, Trip, getSupabaseClient } from '../lib/supabase';
 import { calculateRealTripDistance, formatRealTripDuration } from '../lib/TripDistanceCalculator';
+import { useToast } from './ui/Toast';
 
 const MapboxMonitor = dynamic(() => import('./MapboxMonitor'), {
   ssr: false,
@@ -50,6 +51,7 @@ const safeParseCoords = (coordsStr: string | null | undefined): [number, number]
 };
 
 export default function TripDetailsModal({ trip, profiles, onClose }: TripDetailsModalProps) {
+  const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [activeTrip, setActiveTrip] = useState<TravelActivity>(trip);
   // Mobile tab state: on mobile (< md), toggle between Map view and Telemetry details view
@@ -219,13 +221,6 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
       
       {/* Main Modal Container (Responsive & compact for HD laptops) */}
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl xl:max-w-6xl h-[92vh] max-h-[720px] flex flex-col md:flex-row overflow-hidden border border-slate-200 relative">
-        
-        {/* Toast for copy */}
-        {copied && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[70] bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg shadow-xl font-mono text-xs flex items-center gap-1.5 animate-in slide-in-from-top-2">
-            <span className="material-icons text-[14px]">check_circle</span> Tracking Link Copied!
-          </div>
-        )}
 
         {/* Mobile Segmented Control (< md only) */}
         <div className="md:hidden flex bg-slate-100 border-b border-slate-200 p-1 shrink-0">
@@ -269,6 +264,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
                 onClick={() => {
                   navigator.clipboard.writeText(trackingCode);
                   setCopied(true);
+                  toast.info(`Tracking code #${trackingCode} copied to clipboard.`, 'Tracking Code Copied');
                   setTimeout(() => setCopied(false), 2000);
                 }}
               >
@@ -558,6 +554,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
                 onClick={() => {
                   navigator.clipboard.writeText(`${window.location.origin}/track/${trackingCode}`);
                   setCopied(true);
+                  toast.success('Live trip tracking link copied to clipboard.', 'Link Copied');
                   setTimeout(() => setCopied(false), 2000);
                 }} 
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[10px] font-bold uppercase tracking-wider py-2 rounded-lg transition-all flex justify-center items-center gap-1.5 shadow-sm"

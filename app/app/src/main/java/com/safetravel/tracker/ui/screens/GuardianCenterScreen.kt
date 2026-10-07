@@ -232,7 +232,7 @@ fun SosSection(
         if (sosAlerts.isNotEmpty()) {
             item {
                 Text(
-                    text = "Emergency SOS Alerts 🚨",
+                    text = "Emergency SOS Alerts",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFEF4444),

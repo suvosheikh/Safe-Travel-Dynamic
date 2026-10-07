@@ -31,6 +31,7 @@ import SystemSettingsSection from '../../../../components/sections/SystemSetting
 import SubscriptionPlansSection from '../../../../components/sections/SubscriptionPlansSection';
 import TripDetailsModal from '../../../../components/TripDetailsModal';
 import AuthScreen from '../../../../components/auth/AuthScreen';
+import { useToast } from '../../../../components/ui/Toast';
 
 // Module-level pure helper functions to guarantee component rendering purity
 function createSafeId(prefix: string): string {
@@ -45,6 +46,7 @@ function createTimestamp(): string {
 }
 
 export default function AdminDashboardPage() {
+  const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ email: string; role: 'admin' | 'dispatcher' | 'user'; name: string; id: string } | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -331,37 +333,55 @@ export default function AdminDashboardPage() {
             .eq('id', sosRecord.trip_id);
         }
       }
+      toast.success('SOS alarm incident marked as resolved and safely closed.', 'Incident Resolved');
     } catch (err) {
       console.error('Failed to sync resolved SOS to Supabase:', err);
+      toast.error('Failed to sync resolution to cloud database.', 'Sync Error');
     }
   };
 
   // Toggle user account tier (Premium/Standard)
   const togglePremium = (userId: string) => {
+    let nextStatus = false;
+    let targetName = 'Traveler';
     const updatedProfiles = db.profiles.map(p => {
       if (p.id === userId) {
+        nextStatus = !p.is_premium;
+        targetName = p.full_name;
         return { ...p, is_premium: !p.is_premium };
       }
       return p;
     });
     updateDbState({ ...db, profiles: updatedProfiles });
+    toast.info(
+      nextStatus ? `Premium protection activated for ${targetName}.` : `Standard tier set for ${targetName}.`,
+      'Account Tier Updated'
+    );
   };
 
   // Reset traveler trip credits
   const adjustCredits = (userId: string, amount: number) => {
+    let targetName = 'Traveler';
     const updatedProfiles = db.profiles.map(p => {
       if (p.id === userId) {
+        targetName = p.full_name;
         return { ...p, trip_credits: Math.max(0, p.trip_credits + amount) };
       }
       return p;
     });
     updateDbState({ ...db, profiles: updatedProfiles });
+    toast.info(
+      `${amount > 0 ? '+' : ''}${amount} trip credits assigned to ${targetName}.`,
+      'Credits Updated'
+    );
   };
 
   // Award traveler points (and log it)
   const awardPoints = (userId: string, points: number, reason: string) => {
+    let targetName = 'Traveler';
     const updatedProfiles = db.profiles.map(p => {
       if (p.id === userId) {
+        targetName = p.full_name;
         return { ...p, points_balance: p.points_balance + points };
       }
       return p;
@@ -380,6 +400,10 @@ export default function AdminDashboardPage() {
       profiles: updatedProfiles,
       pointsLogs: [newLog, ...db.pointsLogs]
     });
+    toast.success(
+      `+${points} safety points awarded to ${targetName} (${reason}).`,
+      'Points Awarded'
+    );
   };
 
   // Handle addition of a traveler profile
@@ -401,6 +425,8 @@ export default function AdminDashboardPage() {
       ...db,
       profiles: [...db.profiles, newProfile]
     });
+
+    toast.success(`Profile for "${newProfileName}" created successfully.`, 'Traveler Registered');
 
     // Clear form inputs
     setNewProfileName('');
@@ -429,7 +455,7 @@ export default function AdminDashboardPage() {
     const currentCredits = targetUser?.trip_credits ?? 0;
 
     if (!isPremium && currentCredits <= 0) {
-      alert("[WARNING] Request Rejected: Insufficient trip credit balance! Add safe credits in Traveler Registry, or toggle standard profile as premium.");
+      toast.warning('Insufficient trip credit balance. Add safe credits in Traveler Registry, or switch profile to premium.', 'Booking Rejected');
       return;
     }
 
@@ -464,6 +490,7 @@ export default function AdminDashboardPage() {
     });
 
     setSimBookingSuccess(true);
+    toast.success('Safe transit ride requested! Real-time telemetry tracking is active.', 'Journey Initiated');
     setTimeout(() => {
       setSimBookingSuccess(false);
     }, 4500);
@@ -473,7 +500,7 @@ export default function AdminDashboardPage() {
     // Check if the current passenger has any ongoing transit rides
     const activeTrip = db.trips.find(t => t.user_id === simulatedUserId && t.status === 'ongoing');
     if (!activeTrip) {
-      alert("[WARNING] SOS Locked: There are no active, ongoing transit rides running for this traveler! Request a secure ride in the simulated phone interface first.");
+      toast.warning('No active, ongoing transit rides running for this traveler! Request a ride in the simulated phone interface first.', 'SOS Trigger Locked');
       return;
     }
 
@@ -497,7 +524,7 @@ export default function AdminDashboardPage() {
       sosRecords: [newSos, ...db.sosRecords]
     });
 
-    alert("[SOS EMERGENCY] PANIC SILENT ALARM DISPATCHED! Dispatchers in HQ are instantly loaded with safety beacon and real-time transit telemetry map tracker.");
+    toast.error('PANIC SILENT ALARM DISPATCHED! Dispatchers in HQ are instantly loaded with safety beacon and real-time transit telemetry map tracker.', 'Emergency SOS Alert');
   };
 
   // Main Real-time Supabase Synchronizer for Telemetry & Operations (Self-Healing)
@@ -660,7 +687,7 @@ export default function AdminDashboardPage() {
           await fetchOperationalData(true);
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((status: string, err?: Error | null) => {
         if (!active) return;
         if (status === 'SUBSCRIBED') {
           setRealtimeStatus('connected');

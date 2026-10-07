@@ -9,6 +9,7 @@ import {
   hasSupabaseConfig 
 } from '../../lib/supabase';
 import ConfirmationWizard from '../ConfirmationWizard';
+import { useToast } from '../ui/Toast';
 
 interface SubscriptionPlansSectionProps {
   db: DbState;
@@ -45,6 +46,7 @@ function formatBillingPeriodLabel(period?: string | null, days?: number): string
 }
 
 export default function SubscriptionPlansSection({ db, setDb, currentUser }: SubscriptionPlansSectionProps) {
+  const { toast } = useToast();
   const roleStr = String(currentUser?.role || '').toLowerCase();
   const isAdmin = !currentUser || roleStr === 'admin' || roleStr === 'super_admin' || roleStr.includes('admin');
 
@@ -145,6 +147,11 @@ export default function SubscriptionPlansSection({ db, setDb, currentUser }: Sub
 
   const showNotification = (text: string, type: 'success' | 'error' = 'success') => {
     setStatusMessage({ text, type });
+    if (type === 'success') {
+      toast.success(text, 'Plans & Billing');
+    } else {
+      toast.error(text, 'Plans & Billing');
+    }
     setTimeout(() => setStatusMessage(null), 4000);
   };
 
@@ -423,6 +430,7 @@ export default function SubscriptionPlansSection({ db, setDb, currentUser }: Sub
   const handleCopyTrxId = (trxId: string) => {
     navigator.clipboard.writeText(trxId);
     setCopiedTrxId(trxId);
+    toast.info(`TrxID ${trxId} copied to clipboard.`, 'Copied');
     setTimeout(() => setCopiedTrxId(null), 2000);
   };
 
