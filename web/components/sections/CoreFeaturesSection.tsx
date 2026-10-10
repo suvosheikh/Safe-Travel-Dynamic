@@ -9,8 +9,8 @@ export default function CoreFeaturesSection() {
   const [activeTab, setActiveTab] = useState<'all' | 'vehicle' | 'audio' | 'sos' | 'guardian'>('all');
 
   return (
-    <section id="features" className="py-16 md:py-24 px-4 sm:px-6 md:px-12 relative z-10">
-      <div className="max-w-7xl mx-auto">
+    <section id="features" className="py-16 md:py-24 px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16 relative z-10 w-full">
+      <div className="w-full max-w-[1760px] mx-auto">
         
         {/* Section Header */}
         <div className="text-center mb-12 md:mb-16">
@@ -21,14 +21,14 @@ export default function CoreFeaturesSection() {
             </span>
           </div>
 
-          <h2 className="text-3xl sm:text-4xl md:text-5.5xl font-black text-white tracking-tight mb-4 md:mb-6">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight mb-4 md:mb-6">
             {t('Designed to keep you and your loved ones', 'আপনার প্রতিটি যাত্রায়')} <br className="hidden sm:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500">
               {t('safe during every trip.', 'সর্বোচ্চ নিরাপত্তা ও সুরক্ষার নিশ্চয়তা।')}
             </span>
           </h2>
 
-          <p className="text-slate-300 max-w-2xl mx-auto text-sm sm:text-base md:text-lg leading-relaxed font-normal">
+          <p className="text-slate-300 max-w-3xl mx-auto text-sm sm:text-base md:text-lg leading-relaxed font-normal">
             {t(
               'We combine real-time GPS tracking with vehicle photo capture, emergency background audio recording, and fast 2-second SOS alerts to protect every journey.',
               'রিয়েল-টাইম জিপিএস ট্র্যাকিং, গাড়ির ছবি সংরক্ষণ, ব্যাকগ্রাউন্ড জরুরি অডিও রেকর্ডিং এবং ২-সেকেন্ডের দ্রুত এসওএস সতর্কবার্তার সমন্বয়ে নিশ্চিত হয় আপনার প্রতিটি যাত্রার পূর্ণ সুরক্ষা।'
@@ -37,7 +37,7 @@ export default function CoreFeaturesSection() {
         </div>
 
         {/* Bento Grid Architecture */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6 lg:gap-8">
           
           {/* ========================================================
               BENTO 1: VEHICLE & LICENSE PLATE VERIFICATION VAULT (Cols: 7)

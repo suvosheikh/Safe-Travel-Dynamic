@@ -383,7 +383,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
                 <div className="relative">
                   <div className="absolute w-2 h-2 bg-blue-500 rounded-full -left-[19px] top-1 ring-2 ring-white"></div>
                   <span className="block text-[9.5px] font-mono text-slate-400">
-                    START &bull; {startTime ? startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Origin'}
+                    START • {startTime ? startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Origin'}
                   </span>
                   <span className="block font-semibold text-slate-800 leading-snug mt-0.5 text-xs">
                     {activeTrip.start_address || 'Kazipara Madrasha Road, Mirpur, Dhaka'}
@@ -393,7 +393,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
                 <div className="relative">
                   <div className="absolute w-2 h-2 bg-emerald-500 rounded-full -left-[19px] top-1 ring-2 ring-white"></div>
                   <span className="block text-[9.5px] font-mono text-slate-400">
-                    DESTINATION &bull; {endTime ? endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isCancelled ? 'Cancelled' : isOngoing ? 'In Transit' : 'Completed')}
+                    DESTINATION • {endTime ? endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isCancelled ? 'Cancelled' : isOngoing ? 'In Transit' : 'Completed')}
                   </span>
                   <span className="block font-semibold text-slate-800 leading-snug mt-0.5 text-xs">
                     {activeTrip.end_address || '1100, Kafrul Thana, Dhaka, Dhaka'}
@@ -532,7 +532,7 @@ export default function TripDetailsModal({ trip, profiles, onClose }: TripDetail
                         <div key={idx} className="relative">
                           <div className="absolute w-2 h-2 bg-rose-500 rounded-full -left-[17px] top-1 ring-2 ring-white"></div>
                           <span className="block text-[9px] font-mono text-rose-600 font-bold uppercase">
-                            {logTime} &bull; {log.event || 'SOS EVENT'}
+                            {logTime} • {log.event || 'SOS EVENT'}
                           </span>
                           <span className="block font-medium text-slate-800 text-[11px] leading-snug">
                             {log.details || log.source || (log.response ? `Safety Response: ${log.response}` : 'Alert logged by traveler device')}

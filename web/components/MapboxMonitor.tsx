@@ -2567,7 +2567,7 @@ export default function MapboxMonitor({
                 INTERACTIVE MAP VIEW
               </span>
               <span className="text-slate-500 text-[8.5px] font-mono uppercase mt-0.5">
-                Map token not configured &bull; Click indicators to select
+                Map token not configured • Click indicators to select
               </span>
             </div>
 

@@ -20,6 +20,20 @@
   }
 }
 
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-radar {
+  animation: radarSweep 14s linear infinite;
+  transform-origin: center center;
+}
+
 /* Display Scale Presets for HD / Compact Monitors (FHD Fit Engine) */
 html[data-display-scale="fhd"] {
   zoom: 0.85;

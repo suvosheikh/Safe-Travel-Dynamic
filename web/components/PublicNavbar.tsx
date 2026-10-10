@@ -21,8 +21,8 @@ export default function PublicNavbar() {
   };
 
   return (
-    <nav className="w-full border-b border-slate-800/80 bg-[#020617]/85 backdrop-blur-xl fixed top-0 z-50 transition-all duration-300">
-      <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 md:px-10 h-16 md:h-20">
+    <nav className="w-full border-b border-slate-800/80 bg-[#020617]/90 backdrop-blur-2xl fixed top-0 z-50 transition-all duration-300">
+      <div className="w-full max-w-[1760px] mx-auto flex items-center justify-between px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16 h-16 md:h-20">
         
         {/* Left: Brand Logo & Live Signal */}
         <div className="flex items-center space-x-3 sm:space-x-4">
@@ -41,9 +41,9 @@ export default function PublicNavbar() {
           </Link>
 
           {/* Live Operational Indicator (Desktop) */}
-          <div className="hidden lg:flex items-center space-x-2 bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[10px] font-mono text-emerald-300">
+          <div className="hidden xl:flex items-center space-x-2 bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[10px] font-mono text-emerald-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></span>
-            <span className="font-semibold uppercase tracking-wider">{t('SYSTEM ACTIVE &bull; READY', 'সিস্টেম সক্রিয় &bull; প্রস্তুত')}</span>
+            <span className="font-semibold uppercase tracking-wider">{t('SYSTEM ACTIVE • READY', 'সিস্টেম সক্রিয় • প্রস্তুত')}</span>
           </div>
         </div>
 

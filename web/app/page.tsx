@@ -29,9 +29,9 @@ export default function LandingPage() {
       <CoreFeaturesSection />
 
       {/* ---------------- WHO IS IT FOR? ---------------- */}
-      <section id="use-cases" className="py-12 md:py-16 bg-[#020617] relative z-10 border-t border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 md:px-12">
-          <h2 className="text-2xl md:text-4xl font-bold mb-8 md:mb-12 text-center">{t('Built for', 'যাদের জন্য')} <span className="text-indigo-400">{t('everyday peace of mind.', 'নিশ্চিন্ত জীবন।')}</span></h2>
+      <section id="use-cases" className="py-14 md:py-20 bg-[#020617] relative z-10 border-t border-b border-white/5 w-full">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16">
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-8 md:mb-14 text-center">{t('Built for', 'যাদের জন্য')} <span className="text-indigo-400">{t('everyday peace of mind.', 'নিশ্চিন্ত জীবন।')}</span></h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <div className="p-6 md:p-8 rounded-3xl bg-slate-900 border border-slate-800 relative">
@@ -60,8 +60,8 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------- TESTIMONIALS ---------------- */}
-      <section id="reviews" className="py-12 md:py-16 px-4 md:px-12 relative z-10">
-        <div className="max-w-7xl mx-auto">
+      <section id="reviews" className="py-14 md:py-20 px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16 relative z-10 w-full">
+        <div className="w-full max-w-[1760px] mx-auto">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-3 md:mb-4">{t('Loved by', 'হাজারো মানুষের')} <span className="text-gold-400 text-[#f59e0b]">{t('thousands.', 'ভালোবাসা।')}</span></h2>
             <div className="flex items-center justify-center space-x-1 text-[#f59e0b] mb-3">
@@ -115,9 +115,9 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------- FAQ ---------------- */}
-      <section id="faq" className="py-12 md:py-16 bg-slate-900/30 border-t border-slate-800 relative z-10">
-        <div className="max-w-3xl mx-auto px-4 md:px-6">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 md:mb-12 text-center text-white">{t('Frequently Asked Questions', 'সাধারণ জিজ্ঞাসা')}</h2>
+      <section id="faq" className="py-14 md:py-20 bg-slate-900/30 border-t border-slate-800 relative z-10 w-full">
+        <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 md:px-10">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-8 md:mb-12 text-center text-white">{t('Frequently Asked Questions', 'সাধারণ জিজ্ঞাসা')}</h2>
           <div className="space-y-4 md:space-y-6">
             <div className="bg-slate-900 border border-slate-800 p-5 md:p-6 rounded-2xl">
               <h4 className="text-base md:text-lg font-bold text-white mb-2">{t('Does the person watching me need to download the app?', 'যিনি লোকেশন দেখবেন তার কি অ্যাপ লাগবে?')}</h4>
@@ -136,14 +136,14 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------- CTA FOOTER ---------------- */}
-      <footer className="pt-16 pb-10 md:pt-20 md:pb-16 px-4 md:px-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
+      <footer className="pt-16 pb-10 md:pt-24 md:pb-16 px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16 flex flex-col items-center justify-center text-center relative overflow-hidden w-full">
         {/* Vibrant gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-slate-950 to-emerald-900/30 z-0"></div>
         <div className="absolute bottom-0 w-full h-[300px] md:h-[500px] bg-cyan-600/10 blur-[100px] md:blur-[150px] pointer-events-none z-0"></div>
         
-        <div className="relative z-10 max-w-4xl w-full">
-          <h2 className="text-4xl md:text-7xl font-black mb-6 md:mb-8 text-white tracking-tight">{t('Your safety is in', 'আপনার নিরাপত্তা')} <br/> {t('your hands.', 'আপনার হাতেই।')}</h2>
-          <p className="text-slate-300 text-sm md:text-xl mb-10 md:mb-12 max-w-2xl mx-auto font-light px-2">
+        <div className="relative z-10 max-w-5xl w-full">
+          <h2 className="text-3xl sm:text-5xl md:text-7xl font-black mb-6 md:mb-8 text-white tracking-tight">{t('Your safety is in', 'আপনার নিরাপত্তা')} <br/> {t('your hands.', 'আপনার হাতেই।')}</h2>
+          <p className="text-slate-300 text-sm sm:text-base md:text-xl mb-10 md:mb-12 max-w-2xl mx-auto font-light px-2">
             {t('Don\'t leave your personal security to chance. Download SafeTravel today and experience ultimate peace of mind.', 'নিরাপত্তার বিষয়ে কোনো ছাড় নয়। আজই ডাউনলোড করুন সেফট্রেভেল এবং পরিবারকে রাখুন দুশ্চিন্তামুক্ত।')}
           </p>
           
@@ -166,7 +166,7 @@ export default function LandingPage() {
         </div>
 
         {/* Bottom links */}
-        <div className="relative z-10 w-full max-w-6xl border-t border-white/10 pt-6 md:pt-8 flex flex-col md:flex-row justify-between items-center px-2 md:px-0">
+        <div className="relative z-10 w-full max-w-[1760px] border-t border-white/10 pt-6 md:pt-8 flex flex-col md:flex-row justify-between items-center px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16">
           <div className="flex items-center space-x-2 mb-6 md:mb-0">
              <div className="w-5 h-5 md:w-6 md:h-6 rounded bg-emerald-500 flex items-center justify-center"><span className="material-icons text-white text-[10px] md:text-[12px]">security</span></div>
              <span className="font-bold text-base md:text-lg tracking-tight text-white">Safe<span className="text-emerald-400">Travel</span></span>
