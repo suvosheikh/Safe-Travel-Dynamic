@@ -710,6 +710,8 @@ fun NativeMapLibreView(
             mapViewportState = mapViewportState,
             style = remember { { MapStyle(style = "mapbox://styles/suvosheikh/cmqcnkso0000m01r6ce5y5dch") } },
             logo = {},
+            compass = {},
+            scaleBar = {},
             onMapClickListener = OnMapClickListener { point ->
                 if (routeAlternatives.size > 1) {
                     for (i in routeAlternatives.indices) {
