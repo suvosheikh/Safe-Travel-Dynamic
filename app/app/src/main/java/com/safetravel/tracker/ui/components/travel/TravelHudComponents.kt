@@ -34,7 +34,7 @@ fun MissionControlBar(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, top = 8.dp, bottom = 4.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
         color = Color(0xE60F172A), // Translucent Slate 900
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, Slate700)
