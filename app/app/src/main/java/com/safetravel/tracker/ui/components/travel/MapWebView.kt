@@ -4,9 +4,10 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
-import android.graphics.Path
+import android.graphics.Path as AndroidPath
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
 import android.os.Bundle
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -168,7 +169,7 @@ fun createCustomMarkerBitmap(colorHex: Int, isPulsingUser: Boolean): Bitmap {
         canvas.drawCircle(size / 2f, size / 3f, size / 3.4f, paint)
         
         // Drawing pin needle
-        val path = Path()
+        val path = AndroidPath()
         path.moveTo(size / 2f - size / 4f, size / 3f)
         path.lineTo(size / 2f, size * 0.9f)
         path.lineTo(size / 2f + size / 4f, size / 3f)
