@@ -162,6 +162,7 @@ fun TravelScreen(vm: SafeTravelViewModel) {
     val guardians by vm.userGuardians.collectAsState()
     val currentSpeedKmh by vm.currentSpeedKmh.collectAsState()
     val activeRoutePath by vm.activeRoutePath.collectAsState()
+    val currentBearing by vm.currentBearing.collectAsState()
     
     // Persisted UI States
     val originInput by vm.travelOriginInput.collectAsState()
@@ -219,7 +220,8 @@ fun TravelScreen(vm: SafeTravelViewModel) {
         activeRoutePath = activeRoutePath,
         onUploadAudio = { file, tripId, dur, trigger ->
             vm.uploadAndSaveAudio(file, tripId, dur, trigger)
-        }
+        },
+        currentBearing = currentBearing
     )
 }
 
@@ -260,7 +262,8 @@ fun TravelScreenContent(
     onResolveSos: () -> Unit = {},
     onSelectMapLocation: (Double, Double) -> Unit = { _, _ -> },
     activeRoutePath: List<Map<String, Double>> = emptyList(),
-    onUploadAudio: (java.io.File, String?, Int, String) -> Unit = { _, _, _, _ -> }
+    onUploadAudio: (java.io.File, String?, Int, String) -> Unit = { _, _, _, _ -> },
+    currentBearing: Float = 0f
 ) {
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -543,7 +546,8 @@ fun TravelScreenContent(
                 hasCenteredInitially = hasCenteredInitially,
                 onCenteredInitially = onCenteredInitially,
                 bottomPadding = 72.dp,
-                onToggleSafetyToolkit = { showSafetyToolkit = !showSafetyToolkit }
+                onToggleSafetyToolkit = { showSafetyToolkit = !showSafetyToolkit },
+                userBearing = currentBearing
             )
 
             // Real-Time Speedometer HUD (Square on Left Side of Map)

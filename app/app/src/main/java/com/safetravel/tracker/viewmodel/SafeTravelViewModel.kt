@@ -181,6 +181,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     )
     val currentPosition = MutableStateFlow<Pair<Double, Double>?>(null) // Start as null to trigger locating state
     val currentSpeedKmh = MutableStateFlow(0)
+    val currentBearing = MutableStateFlow(0f)
 
     // --- VOYAGE ANALYTICS (Derived) ---
     val totalDistanceTraveled = MutableStateFlow(0.0)
@@ -1648,13 +1649,25 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         val lat = smoothed.latitude
         val lng = smoothed.longitude
 
-        // 2. Update Live Speedometer
+        // 2. Update Live Speedometer & Live Travel Bearing
         val speedKmh = if (smoothed.hasSpeed() && smoothed.speed >= 0.6f) {
             (smoothed.speed * 3.6f).toInt().coerceAtLeast(0)
         } else {
             0
         }
         currentSpeedKmh.value = speedKmh
+
+        val lastLoc = lastFilteredLocation
+        val calculatedBearing = if (smoothed.hasBearing() && smoothed.bearing != 0f) {
+            smoothed.bearing
+        } else if (lastLoc != null && smoothed.distanceTo(lastLoc) >= 2f && speedKmh >= 2) {
+            lastLoc.bearingTo(smoothed)
+        } else {
+            currentBearing.value
+        }
+        if (calculatedBearing != 0f) {
+            currentBearing.value = (calculatedBearing + 360f) % 360f
+        }
 
         lastFilteredLocation = smoothed
         onManualLocationUpdate(lat, lng)
