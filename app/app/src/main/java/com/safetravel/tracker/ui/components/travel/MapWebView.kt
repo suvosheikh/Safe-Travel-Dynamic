@@ -283,6 +283,7 @@ fun MapboxView(
     onLogReceived: (String) -> Unit = {},
     isFullscreen: Boolean = false,
     onCloseFullscreen: (() -> Unit)? = null,
+    onToggleFullscreen: (() -> Unit)? = null,
     onDeviceLocationChanged: (Double, Double) -> Unit = { _, _ -> },
     transportMode: Int = 2, // 0: Walk, 1: Bike, 2: Car, 3: Bus
     onTripDetailsCalculated: (String, String) -> Unit = { _, _ -> },
@@ -313,6 +314,7 @@ fun MapboxView(
         onLogReceived = onLogReceived,
         isFullscreen = isFullscreen,
         onCloseFullscreen = onCloseFullscreen,
+        onToggleFullscreen = onToggleFullscreen,
         onDeviceLocationChanged = onDeviceLocationChanged,
         transportMode = transportMode,
         onTripDetailsCalculated = onTripDetailsCalculated,
@@ -347,6 +349,7 @@ fun NativeMapLibreView(
     onLogReceived: (String) -> Unit = {},
     isFullscreen: Boolean = false,
     onCloseFullscreen: (() -> Unit)? = null,
+    onToggleFullscreen: (() -> Unit)? = null,
     onDeviceLocationChanged: (Double, Double) -> Unit = { _, _ -> },
     transportMode: Int = 2,
     onTripDetailsCalculated: (String, String) -> Unit = { _, _ -> },
@@ -394,7 +397,6 @@ fun NativeMapLibreView(
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    var isFullscreenOpen by remember { mutableStateOf(false) }
     var orientationMode by remember { mutableStateOf(MapOrientationMode.HEADING_UP) }
     var isCameraLockedToUser by remember { mutableStateOf(true) }
     val deviceHeading by rememberDeviceHeading(userBearing)
@@ -1002,11 +1004,10 @@ fun NativeMapLibreView(
         // Before trip start: 12.dp (aligned at top of map area)
         // During active trip: 88.dp (cleanly below MissionControlBar and Watching row)
         // In Fullscreen dialog: 16.dp with statusBarsPadding
-        val topHudPadding = if (isTripActive && !isFullscreen) 88.dp else if (isFullscreen) 16.dp else 12.dp
+        val topHudPadding = if (isTripActive) 88.dp else 12.dp
         val statusPaddingModifier = if (isFullscreen) Modifier.statusBarsPadding() else Modifier
 
         // Custom Overlay UI: Top-Left Controls (FullScreen Entry/Exit)
-        val hasCloseAction = isFullscreen && onCloseFullscreen != null
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -1018,17 +1019,13 @@ fun NativeMapLibreView(
                 .background(Color(0xFF0F172A).copy(alpha = 0.88f))
                 .border(1.2.dp, Slate700, CircleShape)
                 .clickable {
-                    if (hasCloseAction) {
-                        onCloseFullscreen?.invoke()
-                    } else {
-                        isFullscreenOpen = true
-                    }
+                    onToggleFullscreen?.invoke() ?: onCloseFullscreen?.invoke()
                 },
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = if (hasCloseAction) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                contentDescription = if (hasCloseAction) "Exit Full Screen" else "Enter Full Screen",
+                imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                contentDescription = if (isFullscreen) "Exit Full Screen" else "Enter Full Screen",
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
@@ -1063,7 +1060,7 @@ fun NativeMapLibreView(
                         )
                     } else {
                         orientationMode = MapOrientationMode.HEADING_UP
-                        val targetBearing = if (userBearing != 0f) userBearing.toDouble() else 0.0
+                        val targetBearing = if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()
                         mapViewportState.flyTo(
                             CameraOptions.Builder()
                                 .bearing(targetBearing)
@@ -1331,45 +1328,5 @@ fun NativeMapLibreView(
                 showLocationDisclosure = false
             }
         )
-    }
-
-    // Modal Fullscreen Dialog Overlay
-    if (isFullscreenOpen) {
-        Dialog(
-            onDismissRequest = { isFullscreenOpen = false },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false
-            )
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF090D16))
-            ) {
-                NativeMapLibreView(
-                    destination = destination,
-                    onLocationSelected = onLocationSelected,
-                    mapboxToken = mapboxToken,
-                    modifier = Modifier.fillMaxSize(),
-                    liveUserCoordinates = resolvedUserCoords,
-                    navigationRouteActive = navigationRouteActive,
-                    onEngineLoaded = onEngineLoaded,
-                    onLogReceived = onLogReceived,
-                    isFullscreen = true,
-                    onCloseFullscreen = { isFullscreenOpen = false },
-                    destinationCoords = destinationCoords,
-                    startCoords = startCoords,
-                    liveRoutePath = liveRoutePath,
-                    transportMode = transportMode,
-                    selectedRouteIndex = selectedRouteIndex,
-                    onRouteSelected = onRouteSelected,
-                    onRouteChange = onRouteChange,
-                    fixedPlannedRoute = fixedPlannedRoute,
-                    userBearing = userBearing,
-                    isTripActive = isTripActive
-                )
-            }
-        }
     }
 }

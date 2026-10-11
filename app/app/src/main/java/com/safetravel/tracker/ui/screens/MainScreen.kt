@@ -74,6 +74,11 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
     val isConnected by vm.isSupabaseConnected.collectAsState()
     val activeTrip by vm.activeTrip.collectAsState()
     val newsList by vm.safetyNews.collectAsState()
+    val isMapFullscreen by vm.isMapFullscreen.collectAsState()
+    
+    BackHandler(enabled = isMapFullscreen && selectedTab == 1) {
+        vm.isMapFullscreen.value = false
+    }
     
     // Drawer & Dialog state controllers
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -606,12 +611,13 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                // --- TOP HEADER APP BAR ---
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding() // Directly below clock/battery
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    // --- TOP HEADER APP BAR ---
+                    if (!isMapFullscreen || selectedTab != 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding() // Directly below clock/battery
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -748,6 +754,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                             }
                         }
                     }
+                }
 
                 // --- VIEWPORT / SCREENS CONTAINER ---
                 Box(modifier = Modifier.weight(1f)) {
@@ -865,7 +872,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
             val isMainTabActive = !showVersionLog && !showWeather && !showThana && !showFireService &&
                     !showHospitals && !showBloodBanks && !showEmergencyContacts && !showSafetyTips &&
                     selectedNews == null && watchTripId == null
-            val hideBottomBar = selectedNews != null || watchTripId != null || (showSafetyTips && selectedTip != null)
+            val hideBottomBar = selectedNews != null || watchTripId != null || (showSafetyTips && selectedTip != null) || (selectedTab == 1 && isMapFullscreen)
 
             if (!hideBottomBar) {
                 Box(

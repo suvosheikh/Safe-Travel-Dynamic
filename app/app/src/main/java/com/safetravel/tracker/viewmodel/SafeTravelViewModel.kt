@@ -182,6 +182,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     val currentPosition = MutableStateFlow<Pair<Double, Double>?>(null) // Start as null to trigger locating state
     val currentSpeedKmh = MutableStateFlow(0)
     val currentBearing = MutableStateFlow(0f)
+    val isMapFullscreen = MutableStateFlow(false)
 
     // --- VOYAGE ANALYTICS (Derived) ---
     val totalDistanceTraveled = MutableStateFlow(0.0)

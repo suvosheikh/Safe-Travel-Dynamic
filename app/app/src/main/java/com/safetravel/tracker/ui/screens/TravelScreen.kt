@@ -163,6 +163,7 @@ fun TravelScreen(vm: SafeTravelViewModel) {
     val currentSpeedKmh by vm.currentSpeedKmh.collectAsState()
     val activeRoutePath by vm.activeRoutePath.collectAsState()
     val currentBearing by vm.currentBearing.collectAsState()
+    val isMapFullscreen by vm.isMapFullscreen.collectAsState()
     
     // Persisted UI States
     val originInput by vm.travelOriginInput.collectAsState()
@@ -221,7 +222,9 @@ fun TravelScreen(vm: SafeTravelViewModel) {
         onUploadAudio = { file, tripId, dur, trigger ->
             vm.uploadAndSaveAudio(file, tripId, dur, trigger)
         },
-        currentBearing = currentBearing
+        currentBearing = currentBearing,
+        isMapFullscreen = isMapFullscreen,
+        onToggleFullscreen = { vm.isMapFullscreen.value = !vm.isMapFullscreen.value }
     )
 }
 
@@ -263,7 +266,9 @@ fun TravelScreenContent(
     onSelectMapLocation: (Double, Double) -> Unit = { _, _ -> },
     activeRoutePath: List<Map<String, Double>> = emptyList(),
     onUploadAudio: (java.io.File, String?, Int, String) -> Unit = { _, _, _, _ -> },
-    currentBearing: Float = 0f
+    currentBearing: Float = 0f,
+    isMapFullscreen: Boolean = false,
+    onToggleFullscreen: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -545,10 +550,12 @@ fun TravelScreenContent(
                 onLogReceived = { log -> webViewLogs = (webViewLogs + log).takeLast(60) },
                 hasCenteredInitially = hasCenteredInitially,
                 onCenteredInitially = onCenteredInitially,
-                bottomPadding = 72.dp,
+                bottomPadding = if (isMapFullscreen) 16.dp else 72.dp,
                 onToggleSafetyToolkit = { showSafetyToolkit = !showSafetyToolkit },
                 userBearing = currentBearing,
-                isTripActive = (activeTrip != null)
+                isTripActive = (activeTrip != null),
+                isFullscreen = isMapFullscreen,
+                onToggleFullscreen = onToggleFullscreen
             )
 
             // Real-Time Speedometer HUD (Square on Left Side of Map)
@@ -567,6 +574,7 @@ fun TravelScreenContent(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
+                        .then(if (isMapFullscreen) Modifier.statusBarsPadding() else Modifier)
                 ) {
                     MissionControlBar(
                         vehiclePlate = vehiclePlate.ifBlank { null },
@@ -637,7 +645,7 @@ fun TravelScreenContent(
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp)
-                        .padding(bottom = 88.dp)
+                        .padding(bottom = if (isMapFullscreen) 16.dp else 88.dp)
                         .fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xF20B111E)),
@@ -936,7 +944,7 @@ fun TravelScreenContent(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .navigationBarsPadding()
-                        .padding(start = 20.dp, bottom = 88.dp)
+                        .padding(start = 20.dp, bottom = if (isMapFullscreen) 20.dp else 88.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xE60F172A))
                         .border(1.dp, Slate700, RoundedCornerShape(16.dp))
