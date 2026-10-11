@@ -297,7 +297,8 @@ fun MapboxView(
     onRouteSelected: ((Int, RouteInfo) -> Unit)? = null,
     onRouteChange: ((List<RouteInfo>) -> Unit)? = null,
     fixedPlannedRoute: List<Point>? = null,
-    userBearing: Float = 0f
+    userBearing: Float = 0f,
+    isTripActive: Boolean = false
 ) {
     NativeMapLibreView(
         destination = destination,
@@ -326,7 +327,8 @@ fun MapboxView(
         onRouteSelected = onRouteSelected,
         onRouteChange = onRouteChange,
         fixedPlannedRoute = fixedPlannedRoute,
-        userBearing = userBearing
+        userBearing = userBearing,
+        isTripActive = isTripActive
     )
 }
 
@@ -359,7 +361,8 @@ fun NativeMapLibreView(
     onRouteSelected: ((Int, RouteInfo) -> Unit)? = null,
     onRouteChange: ((List<RouteInfo>) -> Unit)? = null,
     fixedPlannedRoute: List<Point>? = null,
-    userBearing: Float = 0f
+    userBearing: Float = 0f,
+    isTripActive: Boolean = false
 ) {
     // Check if we are in Preview mode to avoid UnsatisfiedLinkError from Mapbox native libraries
     val isPreview = androidx.compose.ui.platform.LocalInspectionMode.current
@@ -612,6 +615,7 @@ fun NativeMapLibreView(
             val centerPoint = when {
                 recordedPath != null && recordedPath.isNotEmpty() -> recordedPath.first()
                 userPoint != null -> userPoint
+                resolvedUserCoords != null -> Point.fromLngLat(resolvedUserCoords.second, resolvedUserCoords.first)
                 startCoords != null -> Point.fromLngLat(startCoords.second, startCoords.first)
                 destCoords != null -> Point.fromLngLat(destCoords.second, destCoords.first)
                 else -> null
@@ -619,19 +623,22 @@ fun NativeMapLibreView(
             
             if (centerPoint != null) {
                 center(centerPoint)
-                zoom(if (recordedPath != null) 14.0 else 13.5)
+                zoom(if (recordedPath != null) 14.0 else 15.0)
             }
             pitch(0.0)
             bearing(if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0)
         }
     }
 
+    var hasCenteredInSession by remember { mutableStateOf(false) }
+
     // Auto-center on user's current location on map load & smooth camera gliding during active travel
     LaunchedEffect(resolvedUserCoords) {
         if (recordedPath == null) {
             resolvedUserCoords?.let { coords ->
                 if (coords.first != 0.0 && coords.second != 0.0) {
-                    if (!hasCenteredInitially) {
+                    if (!hasCenteredInSession) {
+                        hasCenteredInSession = true
                         onCenteredInitially()
                         val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0
                         mapViewportState.flyTo(
@@ -641,7 +648,7 @@ fun NativeMapLibreView(
                                 .bearing(targetBearing)
                                 .build()
                         )
-                    } else if (isCameraLockedToUser && navigationRouteActive) {
+                    } else if (isCameraLockedToUser && isTripActive) {
                         val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0
                         mapViewportState.flyTo(
                             CameraOptions.Builder()
@@ -949,17 +956,23 @@ fun NativeMapLibreView(
             }
         }
 
+        // Dynamic Top Padding for Top HUD controls:
+        // Before trip start: 16.dp (aligned at the top, like native Mapbox compass)
+        // During active trip: 115.dp (smoothly shifted below the Safe Ride bar and Watching badges)
+        val topHudPadding = if (isTripActive && !isFullscreen) 115.dp else 16.dp
+
         // Custom Overlay UI: Top-Left Controls (FullScreen Entry/Exit)
         val hasCloseAction = isFullscreen && onCloseFullscreen != null
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
+                .statusBarsPadding()
+                .padding(top = topHudPadding, start = 16.dp)
                 .shadow(6.dp, CircleShape)
                 .size(46.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF0F172A).copy(alpha = 0.85f))
-                .border(1.dp, Slate700, CircleShape)
+                .background(Color(0xFF0F172A).copy(alpha = 0.88f))
+                .border(1.2.dp, Slate700, CircleShape)
                 .clickable {
                     if (hasCloseAction) {
                         onCloseFullscreen?.invoke()
@@ -979,13 +992,12 @@ fun NativeMapLibreView(
 
         // Custom Overlay UI: Top-Right Controls (Compass & Heading/North Orientation)
         val currentCameraBearing = mapViewportState.cameraState?.bearing ?: 0.0
-        val compassTopPadding = if (navigationRouteActive && !isFullscreen) 115.dp else 16.dp
 
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(top = compassTopPadding, end = 16.dp)
+                .padding(top = topHudPadding, end = 16.dp)
                 .shadow(6.dp, CircleShape)
                 .size(46.dp)
                 .clip(CircleShape)
@@ -1309,7 +1321,9 @@ fun NativeMapLibreView(
                     selectedRouteIndex = selectedRouteIndex,
                     onRouteSelected = onRouteSelected,
                     onRouteChange = onRouteChange,
-                    fixedPlannedRoute = fixedPlannedRoute
+                    fixedPlannedRoute = fixedPlannedRoute,
+                    userBearing = userBearing,
+                    isTripActive = isTripActive
                 )
             }
         }

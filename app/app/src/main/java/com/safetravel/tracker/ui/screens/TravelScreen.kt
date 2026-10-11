@@ -547,7 +547,8 @@ fun TravelScreenContent(
                 onCenteredInitially = onCenteredInitially,
                 bottomPadding = 72.dp,
                 onToggleSafetyToolkit = { showSafetyToolkit = !showSafetyToolkit },
-                userBearing = currentBearing
+                userBearing = currentBearing,
+                isTripActive = (activeTrip != null)
             )
 
             // Real-Time Speedometer HUD (Square on Left Side of Map)

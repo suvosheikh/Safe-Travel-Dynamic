@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -794,39 +795,67 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                             onBack = { selectedNews = null }
                         )
                     } else {
-                        when (selectedTab) {
-                            0 -> HomeScreen(
-                                vm = vm, 
-                                onNewsClick = { selectedNews = it },
-                                onActionClick = { label ->
-                                    if (label == "Emergency Contacts" || label == "Safety Tips") {
-                                        openActionScreen(label)
-                                    } else {
-                                        // Location-sensitive quick actions: Thana, Fire Service, Hospitals, Blood Bank, Weather Alerts
-                                        if (hasLocationPermission) {
-                                            openActionScreen(label)
-                                        } else {
-                                            pendingActionScreen = label
-                                            showActionLocationWizard = true
-                                        }
+                        val isTravelTabActive = selectedTab == 1
+                        var travelTabInitialized by rememberSaveable { mutableStateOf(false) }
+                        if (isTravelTabActive) {
+                            travelTabInitialized = true
+                        }
+
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // Persistent TravelScreen: keeps Mapbox map alive across bottom tab switches
+                            if (travelTabInitialized) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .zIndex(if (isTravelTabActive) 1f else -1f)
+                                        .alpha(if (isTravelTabActive) 1f else 0f)
+                                ) {
+                                    TravelScreen(vm)
+                                }
+                            }
+
+                            // Other Tabs: rendered when not on the Travel tab
+                            if (!isTravelTabActive) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .zIndex(2f)
+                                ) {
+                                    when (selectedTab) {
+                                        0 -> HomeScreen(
+                                            vm = vm, 
+                                            onNewsClick = { selectedNews = it },
+                                            onActionClick = { label ->
+                                                if (label == "Emergency Contacts" || label == "Safety Tips") {
+                                                    openActionScreen(label)
+                                                } else {
+                                                    // Location-sensitive quick actions: Thana, Fire Service, Hospitals, Blood Bank, Weather Alerts
+                                                    if (hasLocationPermission) {
+                                                        openActionScreen(label)
+                                                    } else {
+                                                        pendingActionScreen = label
+                                                        showActionLocationWizard = true
+                                                    }
+                                                }
+                                            }
+                                        )
+                                        2 -> ProfileScreen(vm, onAppInfoClick = { showVersionLog = true })
+                                        3 -> GuardianCenterScreen(vm, onWatchTrip = { watchTripId = it })
+                                        4 -> HistoryScreen(vm)
+                                        5 -> FeedbackScreen(
+                                            vm = vm,
+                                            onBack = { selectedTab = 0 }
+                                        )
+                                        6 -> SupportScreen(
+                                            onBack = { selectedTab = 0 }
+                                        )
+                                        7 -> PremiumScreen(
+                                            vm = vm,
+                                            onBack = { selectedTab = 0 }
+                                        )
                                     }
                                 }
-                            )
-                            1 -> TravelScreen(vm)
-                            2 -> ProfileScreen(vm, onAppInfoClick = { showVersionLog = true })
-                            3 -> GuardianCenterScreen(vm, onWatchTrip = { watchTripId = it })
-                            4 -> HistoryScreen(vm)
-                            5 -> FeedbackScreen(
-                                vm = vm,
-                                onBack = { selectedTab = 0 }
-                            )
-                            6 -> SupportScreen(
-                                onBack = { selectedTab = 0 }
-                            )
-                            7 -> PremiumScreen(
-                                vm = vm,
-                                onBack = { selectedTab = 0 }
-                            )
+                            }
                         }
                     }
                 }
