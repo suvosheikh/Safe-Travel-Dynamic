@@ -41,6 +41,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import com.safetravel.tracker.util.rememberSmoothLocation
+import com.safetravel.tracker.util.rememberDeviceHeading
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -395,6 +397,7 @@ fun NativeMapLibreView(
     var isFullscreenOpen by remember { mutableStateOf(false) }
     var orientationMode by remember { mutableStateOf(MapOrientationMode.HEADING_UP) }
     var isCameraLockedToUser by remember { mutableStateOf(true) }
+    val deviceHeading by rememberDeviceHeading(userBearing)
 
     // 1. Set Mapbox Access Token statically on load/update
     LaunchedEffect(mapboxToken) {
@@ -719,6 +722,7 @@ fun NativeMapLibreView(
             logo = {},
             compass = {},
             scaleBar = {},
+            attribution = {},
             onMapClickListener = OnMapClickListener { point ->
                 if (routeAlternatives.size > 1) {
                     for (i in routeAlternatives.indices) {
@@ -826,27 +830,65 @@ fun NativeMapLibreView(
                         .allowOverlap(true)
                         .build()
                 ) {
+                    val currentCamBearing = (mapViewportState.cameraState?.bearing ?: 0.0).toFloat()
+                    val beamScreenRotation = (deviceHeading - currentCamBearing + 360f) % 360f
+
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(100.dp)
                     ) {
+                        // 1. Google Maps Directional Flashlight Beam (Field-of-View Cone)
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .rotate(beamScreenRotation)
+                        ) {
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            val beamRadius = 46.dp.toPx()
+                            val beamSweep = 56f
+                            val startAngle = -90f - (beamSweep / 2f)
+
+                            val beamBrush = Brush.radialGradient(
+                                0.0f to Color(0xFF2979FF).copy(alpha = 0.55f),
+                                0.35f to Color(0xFF2979FF).copy(alpha = 0.30f),
+                                0.70f to Color(0xFF2979FF).copy(alpha = 0.10f),
+                                1.0f to Color(0xFF2979FF).copy(alpha = 0.0f),
+                                center = androidx.compose.ui.geometry.Offset(cx, cy),
+                                radius = beamRadius
+                            )
+
+                            drawArc(
+                                brush = beamBrush,
+                                startAngle = startAngle,
+                                sweepAngle = beamSweep,
+                                useCenter = true,
+                                topLeft = androidx.compose.ui.geometry.Offset(cx - beamRadius, cy - beamRadius),
+                                size = androidx.compose.ui.geometry.Size(beamRadius * 2f, beamRadius * 2f)
+                            )
+                        }
+
+                        // 2. Accuracy Pulsing Ring
                         Box(
                             modifier = Modifier
-                                .size((16 * pulseScale).dp)
-                                .alpha(pulseAlpha)
-                                .background(Color(0xFF007AFF), shape = CircleShape)
+                                .size((18 * pulseScale).dp)
+                                .alpha(pulseAlpha * 0.7f)
+                                .background(Color(0xFF2979FF).copy(alpha = 0.25f), shape = CircleShape)
                         )
+
+                        // 3. Google Maps White & Blue Location Dot (Puck)
                         Box(
                             modifier = Modifier
-                                .size(14.dp)
-                                .shadow(2.dp, CircleShape)
+                                .size(17.dp)
+                                .shadow(3.dp, CircleShape)
                                 .background(Color.White, shape = CircleShape)
-                                .padding(2.dp)
+                                .padding(2.5.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color(0xFF007AFF), shape = CircleShape)
+                                    .background(Color(0xFF1A73E8), shape = CircleShape)
                             )
                         }
                     }
@@ -957,16 +999,18 @@ fun NativeMapLibreView(
         }
 
         // Dynamic Top Padding for Top HUD controls:
-        // Before trip start: 16.dp (aligned at the top, like native Mapbox compass)
-        // During active trip: 115.dp (smoothly shifted below the Safe Ride bar and Watching badges)
-        val topHudPadding = if (isTripActive && !isFullscreen) 115.dp else 16.dp
+        // Before trip start: 12.dp (aligned at top of map area)
+        // During active trip: 88.dp (cleanly below MissionControlBar and Watching row)
+        // In Fullscreen dialog: 16.dp with statusBarsPadding
+        val topHudPadding = if (isTripActive && !isFullscreen) 88.dp else if (isFullscreen) 16.dp else 12.dp
+        val statusPaddingModifier = if (isFullscreen) Modifier.statusBarsPadding() else Modifier
 
         // Custom Overlay UI: Top-Left Controls (FullScreen Entry/Exit)
         val hasCloseAction = isFullscreen && onCloseFullscreen != null
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .statusBarsPadding()
+                .then(statusPaddingModifier)
                 .padding(top = topHudPadding, start = 16.dp)
                 .shadow(6.dp, CircleShape)
                 .size(46.dp)
@@ -996,7 +1040,7 @@ fun NativeMapLibreView(
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .statusBarsPadding()
+                .then(statusPaddingModifier)
                 .padding(top = topHudPadding, end = 16.dp)
                 .shadow(6.dp, CircleShape)
                 .size(46.dp)
