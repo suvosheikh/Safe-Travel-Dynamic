@@ -28,31 +28,45 @@ object LocationHelper {
     suspend fun getCurrentLocation(context: Context): Location? = suspendCancellableCoroutine { cont ->
         try {
             val fusedClient = LocationServices.getFusedLocationProviderClient(context)
-            fusedClient.getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                null
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    saveLastSavedLocation(context, location.latitude, location.longitude)
-                    cont.resume(location)
+            // 1. Immediately check lastLocation for 0ms cold-start response
+            fusedClient.lastLocation.addOnSuccessListener { lastLoc ->
+                if (lastLoc != null && lastLoc.latitude != 0.0 && lastLoc.longitude != 0.0) {
+                    saveLastSavedLocation(context, lastLoc.latitude, lastLoc.longitude)
+                    if (cont.isActive) cont.resume(lastLoc)
                 } else {
-                    fusedClient.lastLocation.addOnSuccessListener { lastLoc ->
-                        if (lastLoc != null) saveLastSavedLocation(context, lastLoc.latitude, lastLoc.longitude)
-                        cont.resume(lastLoc)
+                    // Fallback to high-accuracy fresh fix
+                    fusedClient.getCurrentLocation(
+                        Priority.PRIORITY_HIGH_ACCURACY,
+                        null
+                    ).addOnSuccessListener { location ->
+                        if (location != null && location.latitude != 0.0 && location.longitude != 0.0) {
+                            saveLastSavedLocation(context, location.latitude, location.longitude)
+                            if (cont.isActive) cont.resume(location)
+                        } else {
+                            if (cont.isActive) cont.resume(null)
+                        }
                     }.addOnFailureListener {
-                        cont.resume(null)
+                        if (cont.isActive) cont.resume(null)
                     }
                 }
             }.addOnFailureListener {
-                fusedClient.lastLocation.addOnSuccessListener { lastLoc ->
-                    if (lastLoc != null) saveLastSavedLocation(context, lastLoc.latitude, lastLoc.longitude)
-                    cont.resume(lastLoc)
+                // Fallback to high-accuracy fresh fix
+                fusedClient.getCurrentLocation(
+                    Priority.PRIORITY_HIGH_ACCURACY,
+                    null
+                ).addOnSuccessListener { location ->
+                    if (location != null && location.latitude != 0.0 && location.longitude != 0.0) {
+                        saveLastSavedLocation(context, location.latitude, location.longitude)
+                        if (cont.isActive) cont.resume(location)
+                    } else {
+                        if (cont.isActive) cont.resume(null)
+                    }
                 }.addOnFailureListener {
-                    cont.resume(null)
+                    if (cont.isActive) cont.resume(null)
                 }
             }
         } catch (e: Exception) {
-            cont.resume(null)
+            if (cont.isActive) cont.resume(null)
         }
     }
 

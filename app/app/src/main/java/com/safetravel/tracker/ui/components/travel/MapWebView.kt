@@ -651,10 +651,13 @@ fun NativeMapLibreView(
         if (recordedPath == null) {
             resolvedUserCoords?.let { coords ->
                 if (coords.first != 0.0 && coords.second != 0.0) {
+                    val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
+                    val currentZoom = mapViewportState.cameraState?.zoom ?: 0.0
+                    val effectiveZoom = if (currentZoom < 13.0) 15.5 else currentZoom
+
                     if (!hasCenteredInSession) {
                         hasCenteredInSession = true
                         onCenteredInitially()
-                        val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                         MapViewportCoordinator.flyToLocation(
                             viewportState = mapViewportState,
                             lat = coords.first,
@@ -663,12 +666,11 @@ fun NativeMapLibreView(
                             bearing = targetBearing
                         )
                     } else if (isCameraLockedToUser) {
-                        val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                         MapViewportCoordinator.flyToLocation(
                             viewportState = mapViewportState,
                             lat = coords.first,
                             lng = coords.second,
-                            zoom = mapViewportState.cameraState?.zoom ?: 15.5,
+                            zoom = effectiveZoom,
                             bearing = targetBearing
                         )
                     }
@@ -729,6 +731,20 @@ fun NativeMapLibreView(
                     hasPermission = hasLocationPermission
                 )
                 mapView.mapboxMap.setCamera(initCam)
+
+                // CRITICAL: When the Mapbox style finishes loading, re-enforce the camera to prevent style defaults from showing the globe
+                mapView.mapboxMap.subscribeStyleLoaded { _ ->
+                    val freshCoords = resolvedUserCoords ?: LocationHelper.getLastSavedLocation(context)
+                    val freshCam = MapViewportCoordinator.resolveInitialCamera(
+                        context = context,
+                        liveCoords = freshCoords,
+                        startCoords = startCoords,
+                        destCoords = destCoords,
+                        recordedPath = recordedPath,
+                        hasPermission = hasLocationPermission
+                    )
+                    mapView.mapboxMap.setCamera(freshCam)
+                }
             }
 
             // 2. Ultra-smooth native rotation stream (Google Maps style, zero recomposition lag)
@@ -740,15 +756,18 @@ fun NativeMapLibreView(
                         snapshotFlow { deviceHeading }
                             .collect { heading ->
                                 if (isCameraLockedToUser && orientationMode == MapOrientationMode.HEADING_UP) {
-                                    val targetBearing = if (userBearing > 0f) userBearing.toDouble() else heading.toDouble()
-                                    val currentCam = mapView.mapboxMap.cameraState.bearing
-                                    val diff = kotlin.math.abs(MapViewportCoordinator.calculateAngleDiff(targetBearing, currentCam))
-                                    if (diff >= 0.25) {
-                                        mapView.mapboxMap.setCamera(
-                                            CameraOptions.Builder()
-                                                .bearing(targetBearing)
-                                                .build()
-                                        )
+                                    val currentCam = mapView.mapboxMap.cameraState
+                                    // Guard: DO NOT interrupt camera with setCamera if the camera has not yet zoomed into street level
+                                    if (currentCam.zoom >= 10.0) {
+                                        val targetBearing = if (userBearing > 0f) userBearing.toDouble() else heading.toDouble()
+                                        val diff = kotlin.math.abs(MapViewportCoordinator.calculateAngleDiff(targetBearing, currentCam.bearing))
+                                        if (diff >= 0.25) {
+                                            mapView.mapboxMap.setCamera(
+                                                CameraOptions.Builder()
+                                                    .bearing(targetBearing)
+                                                    .build()
+                                            )
+                                        }
                                     }
                                 }
                             }

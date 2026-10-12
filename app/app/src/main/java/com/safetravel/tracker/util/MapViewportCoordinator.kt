@@ -50,9 +50,7 @@ object MapViewportCoordinator {
 
         val zoomLevel = when {
             recordedPath != null && recordedPath.isNotEmpty() -> ROUTE_OVERVIEW_ZOOM
-            liveCoords != null || cachedLoc != null -> DEFAULT_STREET_ZOOM
-            hasPermission -> DEFAULT_STREET_ZOOM
-            else -> DEFAULT_CITY_ZOOM
+            else -> DEFAULT_STREET_ZOOM
         }
 
         return CameraOptions.Builder()
@@ -81,10 +79,11 @@ object MapViewportCoordinator {
         bearing: Double = 0.0
     ) {
         if (lat == 0.0 && lng == 0.0) return
+        val targetZoom = if (zoom < 13.0) DEFAULT_STREET_ZOOM else zoom
         viewportState.flyTo(
             CameraOptions.Builder()
                 .center(Point.fromLngLat(lng, lat))
-                .zoom(zoom)
+                .zoom(targetZoom)
                 .bearing(bearing)
                 .pitch(0.0)
                 .build()
