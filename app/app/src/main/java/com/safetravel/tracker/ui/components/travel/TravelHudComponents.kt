@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -92,81 +91,6 @@ fun MissionControlBar(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
-            }
-        }
-    }
-}
-
-/**
- * Pre-Journey "Airlock" Security Check UI
- */
-@Composable
-fun PreJourneySecurityCheck(
-    vehiclePlate: String,
-    onPlateChange: (String) -> Unit,
-    onTakePhoto: () -> Unit,
-    hasPhoto: Boolean,
-    isPhotoLoading: Boolean,
-    plateLabel: String = "Vehicle Plate",
-    platePlaceholder: String = "e.g. 42-1200"
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Slate800.copy(alpha = 0.5f))
-            .border(1.dp, Slate700.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "TRIP SAFETY CHECK",
-            color = Emerald400,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.sp
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Vehicle Plate Input
-            OutlinedTextField(
-                value = vehiclePlate,
-                onValueChange = onPlateChange,
-                label = { Text(plateLabel, fontSize = 12.sp) },
-                placeholder = { Text(platePlaceholder, fontSize = 12.sp) },
-                modifier = Modifier.weight(1f),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Slate700,
-                    focusedBorderColor = Emerald400,
-                    focusedLabelColor = Emerald400
-                )
-            )
-
-            // Evidence Photo Button
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (hasPhoto) Emerald400.copy(alpha = 0.2f) else Slate700)
-                    .clickable { onTakePhoto() },
-                contentAlignment = Alignment.Center
-            ) {
-                if (isPhotoLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Emerald400, strokeWidth = 2.dp)
-                } else {
-                    Icon(
-                        imageVector = if (hasPhoto) Icons.Default.CheckCircle else Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        tint = if (hasPhoto) Emerald400 else Color.White
-                    )
-                }
             }
         }
     }

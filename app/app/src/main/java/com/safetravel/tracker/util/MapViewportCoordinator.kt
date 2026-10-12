@@ -73,7 +73,7 @@ object MapViewportCoordinator {
     /**
      * Smoothly flies the camera to the specified coordinates with specified zoom and bearing.
      */
-    suspend fun flyToLocation(
+    fun flyToLocation(
         viewportState: MapViewportState,
         lat: Double,
         lng: Double,
