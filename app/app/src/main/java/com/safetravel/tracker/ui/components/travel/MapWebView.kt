@@ -426,8 +426,9 @@ fun NativeMapLibreView(
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
 
-    // 3. Fetch Device Location Coordinates
-    var deviceCoords by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    // 3. Fetch Device Location Coordinates (Pre-warmed with last cached coordinates to prevent cold-start globe view)
+    val cachedLocation = remember { LocationHelper.getLastSavedLocation(context) }
+    var deviceCoords by remember { mutableStateOf<Pair<Double, Double>?>(cachedLocation) }
 
     LaunchedEffect(hasLocationPermission, liveUserCoordinates) {
         // If liveUserCoordinates is provided by the ViewModel, use ViewModel as the single source of truth
@@ -491,6 +492,20 @@ fun NativeMapLibreView(
                 throw e // Rethrow to allow standard Compose coroutine teardown
             } catch (e: Exception) {
                 Log.e("MapWebView", "Error during location tracking setup", e)
+            }
+        }
+    }
+
+    LaunchedEffect(hasLocationPermission) {
+        if (hasLocationPermission) {
+            try {
+                val loc = LocationHelper.getCurrentLocation(context)
+                if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
+                    deviceCoords = Pair(loc.latitude, loc.longitude)
+                    onDeviceLocationChanged(loc.latitude, loc.longitude)
+                }
+            } catch (e: Exception) {
+                // Ignore gracefully
             }
         }
     }
@@ -623,13 +638,12 @@ fun NativeMapLibreView(
                 resolvedUserCoords != null -> Point.fromLngLat(resolvedUserCoords.second, resolvedUserCoords.first)
                 startCoords != null -> Point.fromLngLat(startCoords.second, startCoords.first)
                 destCoords != null -> Point.fromLngLat(destCoords.second, destCoords.first)
-                else -> null
+                cachedLocation != null -> Point.fromLngLat(cachedLocation.second, cachedLocation.first)
+                else -> Point.fromLngLat(90.4125, 23.8103)
             }
             
-            if (centerPoint != null) {
-                center(centerPoint)
-                zoom(if (recordedPath != null) 14.0 else 15.0)
-            }
+            center(centerPoint)
+            zoom(if (recordedPath != null) 14.0 else 15.5)
             pitch(0.0)
             bearing(if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0)
         }
@@ -649,7 +663,7 @@ fun NativeMapLibreView(
                         mapViewportState.flyTo(
                             CameraOptions.Builder()
                                 .center(Point.fromLngLat(coords.second, coords.first))
-                                .zoom(15.0)
+                                .zoom(15.5)
                                 .bearing(targetBearing)
                                 .build()
                         )

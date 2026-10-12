@@ -33,9 +33,11 @@ object LocationHelper {
                 null
             ).addOnSuccessListener { location ->
                 if (location != null) {
+                    saveLastSavedLocation(context, location.latitude, location.longitude)
                     cont.resume(location)
                 } else {
                     fusedClient.lastLocation.addOnSuccessListener { lastLoc ->
+                        if (lastLoc != null) saveLastSavedLocation(context, lastLoc.latitude, lastLoc.longitude)
                         cont.resume(lastLoc)
                     }.addOnFailureListener {
                         cont.resume(null)
@@ -43,6 +45,7 @@ object LocationHelper {
                 }
             }.addOnFailureListener {
                 fusedClient.lastLocation.addOnSuccessListener { lastLoc ->
+                    if (lastLoc != null) saveLastSavedLocation(context, lastLoc.latitude, lastLoc.longitude)
                     cont.resume(lastLoc)
                 }.addOnFailureListener {
                     cont.resume(null)
@@ -67,7 +70,10 @@ object LocationHelper {
 
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { trySend(it) }
+                result.lastLocation?.let {
+                    saveLastSavedLocation(context, it.latitude, it.longitude)
+                    trySend(it)
+                }
             }
         }
 
@@ -203,5 +209,39 @@ object LocationHelper {
             Log.e(TAG, "Nominatim HTTP geocoding fallback failed", e)
         }
         return Pair("My Location", "Dhaka")
+    }
+
+    /**
+     * Persists user's last confirmed valid GPS coordinates in local SharedPreferences.
+     * Prevents globe rendering and eliminates cold-start positioning delay.
+     */
+    fun saveLastSavedLocation(context: Context, lat: Double, lng: Double) {
+        if (lat == 0.0 && lng == 0.0) return
+        try {
+            val prefs = context.getSharedPreferences("safetravel_location_cache", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putFloat("cached_lat", lat.toFloat())
+                .putFloat("cached_lng", lng.toFloat())
+                .apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving location cache", e)
+        }
+    }
+
+    /**
+     * Retrieves user's last saved GPS coordinates from local SharedPreferences.
+     * Returns null on first install before any location fix.
+     */
+    fun getLastSavedLocation(context: Context): Pair<Double, Double>? {
+        return try {
+            val prefs = context.getSharedPreferences("safetravel_location_cache", Context.MODE_PRIVATE)
+            if (prefs.contains("cached_lat") && prefs.contains("cached_lng")) {
+                val lat = prefs.getFloat("cached_lat", 0f).toDouble()
+                val lng = prefs.getFloat("cached_lng", 0f).toDouble()
+                if (lat != 0.0 && lng != 0.0) Pair(lat, lng) else null
+            } else null
+        } catch (e: Exception) {
+            null
+        }
     }
 }

@@ -537,6 +537,7 @@ fun TravelScreenContent(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     }
                 },
+                onDeviceLocationChanged = onUpdatePosition,
                 mapboxToken = mapboxToken,
                 liveUserCoordinates = liveUserCoordinates,
                 navigationRouteActive = (activeTrip != null || destinationInput.isNotBlank() || tripDestinationCoords != null),

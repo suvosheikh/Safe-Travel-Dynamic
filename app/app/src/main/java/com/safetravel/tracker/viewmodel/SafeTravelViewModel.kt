@@ -179,7 +179,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             EmergencyContact("c-2", "Local Dispatch Center", "Emergency Hotline", "911 / 112")
         )
     )
-    val currentPosition = MutableStateFlow<Pair<Double, Double>?>(null) // Start as null to trigger locating state
+    val currentPosition = MutableStateFlow<Pair<Double, Double>?>(LocationHelper.getLastSavedLocation(application))
     val currentSpeedKmh = MutableStateFlow(0)
     val currentBearing = MutableStateFlow(0f)
     val isMapFullscreen = MutableStateFlow(false)
@@ -548,7 +548,10 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         // 2. Initial User Session Data (Trips, Points, Guardians)
         refreshData()
 
-        // 3. Smart Low-Bandwidth Alert Polling (Every 30s, strictly for incoming trip shares/alerts)
+        // 3. Request immediate location on app launch to prepare GPS fix
+        requestImmediateLocation()
+
+        // 4. Smart Low-Bandwidth Alert Polling (Every 30s, strictly for incoming trip shares/alerts)
         viewModelScope.launch {
             while (isActive) {
                 delay(30000) // 30 seconds interval (reduces polling traffic by >95%)
@@ -1586,6 +1589,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
 
     fun onManualLocationUpdate(lat: Double, lng: Double) {
         currentPosition.value = Pair(lat, lng)
+        LocationHelper.saveLastSavedLocation(getApplication(), lat, lng)
         
         // Auto-sync origin input if it's still in initial state
         if (travelOriginInput.value == "Locating..." || travelOriginInput.value == "Unknown Location") {
