@@ -51,6 +51,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import com.safetravel.tracker.util.LocationHelper
+import com.safetravel.tracker.util.MapViewportCoordinator
 import com.safetravel.tracker.R
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.Manifest
@@ -629,24 +630,20 @@ fun NativeMapLibreView(
         }
     }
 
-    // 5. Initialize Camera Viewport State
+    // 5. Initialize Camera Viewport State via MapViewportCoordinator
+    val initialCamera = remember(hasLocationPermission) {
+        MapViewportCoordinator.resolveInitialCamera(
+            context = context,
+            liveCoords = resolvedUserCoords,
+            startCoords = startCoords,
+            destCoords = destCoords,
+            recordedPath = recordedPath,
+            hasPermission = hasLocationPermission
+        )
+    }
+
     val mapViewportState = rememberMapViewportState {
-        setCameraOptions {
-            val centerPoint = when {
-                recordedPath != null && recordedPath.isNotEmpty() -> recordedPath.first()
-                userPoint != null -> userPoint
-                resolvedUserCoords != null -> Point.fromLngLat(resolvedUserCoords.second, resolvedUserCoords.first)
-                startCoords != null -> Point.fromLngLat(startCoords.second, startCoords.first)
-                destCoords != null -> Point.fromLngLat(destCoords.second, destCoords.first)
-                cachedLocation != null -> Point.fromLngLat(cachedLocation.second, cachedLocation.first)
-                else -> Point.fromLngLat(90.4125, 23.8103)
-            }
-            
-            center(centerPoint)
-            zoom(if (recordedPath != null) 14.0 else 15.5)
-            pitch(0.0)
-            bearing(if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0)
-        }
+        setCameraOptions(initialCamera)
     }
 
     var hasCenteredInSession by remember { mutableStateOf(false) }
@@ -660,50 +657,23 @@ fun NativeMapLibreView(
                         hasCenteredInSession = true
                         onCenteredInitially()
                         val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
-                        mapViewportState.flyTo(
-                            CameraOptions.Builder()
-                                .center(Point.fromLngLat(coords.second, coords.first))
-                                .zoom(15.5)
-                                .bearing(targetBearing)
-                                .build()
+                        MapViewportCoordinator.flyToLocation(
+                            viewportState = mapViewportState,
+                            lat = coords.first,
+                            lng = coords.second,
+                            zoom = 15.5,
+                            bearing = targetBearing
                         )
                     } else if (isCameraLockedToUser) {
                         val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
-                        mapViewportState.flyTo(
-                            CameraOptions.Builder()
-                                .center(Point.fromLngLat(coords.second, coords.first))
-                                .bearing(targetBearing)
-                                .build()
+                        MapViewportCoordinator.flyToLocation(
+                            viewportState = mapViewportState,
+                            lat = coords.first,
+                            lng = coords.second,
+                            zoom = mapViewportState.cameraState?.zoom ?: 15.5,
+                            bearing = targetBearing
                         )
                     }
-                }
-            }
-        }
-    }
-
-    // Dynamic camera bearing alignment: smoothly orient camera in HEADING_UP mode as user turns phone or moves
-    LaunchedEffect(deviceHeading, userBearing, orientationMode, isCameraLockedToUser) {
-        if (!isCameraLockedToUser) return@LaunchedEffect
-
-        when (orientationMode) {
-            MapOrientationMode.HEADING_UP -> {
-                val activeTargetBearing = if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()
-                val currentCamBearing = mapViewportState.cameraState?.bearing ?: 0.0
-                val diff = kotlin.math.abs((activeTargetBearing - currentCamBearing + 540) % 360 - 180)
-                if (diff >= 0.8) {
-                    mapViewportState.setCameraOptions {
-                        bearing(activeTargetBearing)
-                    }
-                }
-            }
-            MapOrientationMode.NORTH_UP -> {
-                val currentCamBearing = mapViewportState.cameraState?.bearing ?: 0.0
-                if (kotlin.math.abs(currentCamBearing) >= 1.0) {
-                    mapViewportState.flyTo(
-                        CameraOptions.Builder()
-                            .bearing(0.0)
-                            .build()
-                    )
                 }
             }
         }
@@ -750,6 +720,54 @@ fun NativeMapLibreView(
                 true
             }
         ) {
+            // 1. Instantly enforce initial camera position directly on native MapView to eliminate cold-start globe view
+            MapEffect(Unit) { mapView ->
+                val initCam = MapViewportCoordinator.resolveInitialCamera(
+                    context = context,
+                    liveCoords = resolvedUserCoords,
+                    startCoords = startCoords,
+                    destCoords = destCoords,
+                    recordedPath = recordedPath,
+                    hasPermission = hasLocationPermission
+                )
+                mapView.mapboxMap.setCamera(initCam)
+            }
+
+            // 2. Ultra-smooth native rotation stream (Google Maps style, zero recomposition lag)
+            MapEffect(orientationMode, isCameraLockedToUser, userBearing) { mapView ->
+                if (!isCameraLockedToUser) return@MapEffect
+
+                when (orientationMode) {
+                    MapOrientationMode.HEADING_UP -> {
+                        snapshotFlow { deviceHeading }
+                            .collect { heading ->
+                                if (isCameraLockedToUser && orientationMode == MapOrientationMode.HEADING_UP) {
+                                    val targetBearing = if (userBearing > 0f) userBearing.toDouble() else heading.toDouble()
+                                    val currentCam = mapView.mapboxMap.cameraState.bearing
+                                    val diff = kotlin.math.abs(MapViewportCoordinator.calculateAngleDiff(targetBearing, currentCam))
+                                    if (diff >= 0.25) {
+                                        mapView.mapboxMap.setCamera(
+                                            CameraOptions.Builder()
+                                                .bearing(targetBearing)
+                                                .build()
+                                        )
+                                    }
+                                }
+                            }
+                    }
+                    MapOrientationMode.NORTH_UP -> {
+                        val currentCam = mapView.mapboxMap.cameraState.bearing
+                        if (kotlin.math.abs(currentCam) >= 0.5) {
+                            mapViewportState.flyTo(
+                                CameraOptions.Builder()
+                                    .bearing(0.0)
+                                    .build()
+                            )
+                        }
+                    }
+                }
+            }
+
             // Destination custom view annotation using provided drawable (Only if destination exists)
             if (destCoords != null) {
                 val destinationPoint = Point.fromLngLat(destCoords.second, destCoords.first)
@@ -1090,7 +1108,7 @@ fun NativeMapLibreView(
                 Canvas(
                     modifier = Modifier
                         .size(24.dp)
-                        .rotate((-currentCameraBearing).toFloat())
+                        .rotate(if (orientationMode == MapOrientationMode.HEADING_UP) (-deviceHeading) else (-currentCameraBearing).toFloat())
                 ) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f

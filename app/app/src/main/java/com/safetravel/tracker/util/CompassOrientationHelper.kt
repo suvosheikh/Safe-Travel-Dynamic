@@ -88,11 +88,14 @@ fun rememberDeviceHeading(gpsBearing: Float = 0f): State<Float> {
                 }
 
                 if (rawAzimuthDeg != null) {
-                    // Instantaneous low-pass filter (Exponential Moving Average)
-                    // Zero coroutine cancellation delay - delivers smooth 60fps movement
+                    // Adaptive low-pass filter:
+                    // Active rotation (> 6 deg): fast alpha (0.78f) for zero-lag instant responsiveness
+                    // Micro movements (<= 6 deg): smooth alpha (0.45f) to filter out natural hand tremor
                     val diff = ((rawAzimuthDeg - filteredHeading + 540f) % 360f) - 180f
-                    if (kotlin.math.abs(diff) > 0.4f) {
-                        filteredHeading = (filteredHeading + diff * 0.38f + 360f) % 360f
+                    val absDiff = kotlin.math.abs(diff)
+                    if (absDiff > 0.25f) {
+                        val alpha = if (absDiff > 6f) 0.78f else 0.45f
+                        filteredHeading = (filteredHeading + diff * alpha + 360f) % 360f
                         headingState.value = filteredHeading
                     }
                 }
