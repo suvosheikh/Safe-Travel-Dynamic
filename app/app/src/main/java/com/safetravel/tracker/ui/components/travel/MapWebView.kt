@@ -631,7 +631,7 @@ fun NativeMapLibreView(
                 zoom(if (recordedPath != null) 14.0 else 15.0)
             }
             pitch(0.0)
-            bearing(if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0)
+            bearing(if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0)
         }
     }
 
@@ -645,7 +645,7 @@ fun NativeMapLibreView(
                     if (!hasCenteredInSession) {
                         hasCenteredInSession = true
                         onCenteredInitially()
-                        val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0
+                        val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                         mapViewportState.flyTo(
                             CameraOptions.Builder()
                                 .center(Point.fromLngLat(coords.second, coords.first))
@@ -653,8 +653,8 @@ fun NativeMapLibreView(
                                 .bearing(targetBearing)
                                 .build()
                         )
-                    } else if (isCameraLockedToUser && isTripActive) {
-                        val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0
+                    } else if (isCameraLockedToUser) {
+                        val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                         mapViewportState.flyTo(
                             CameraOptions.Builder()
                                 .center(Point.fromLngLat(coords.second, coords.first))
@@ -667,20 +667,18 @@ fun NativeMapLibreView(
         }
     }
 
-    // Dynamic camera bearing alignment: smoothly orient camera in HEADING_UP mode as user moves
-    LaunchedEffect(userBearing, orientationMode) {
+    // Dynamic camera bearing alignment: smoothly orient camera in HEADING_UP mode as user turns phone or moves
+    LaunchedEffect(deviceHeading, userBearing, orientationMode, isCameraLockedToUser) {
+        if (!isCameraLockedToUser) return@LaunchedEffect
+
         when (orientationMode) {
             MapOrientationMode.HEADING_UP -> {
-                if (userBearing != 0f) {
-                    val targetBearing = userBearing.toDouble()
-                    val currentCamBearing = mapViewportState.cameraState?.bearing ?: 0.0
-                    val diff = kotlin.math.abs((targetBearing - currentCamBearing + 540) % 360 - 180)
-                    if (diff >= 4.0) {
-                        mapViewportState.flyTo(
-                            CameraOptions.Builder()
-                                .bearing(targetBearing)
-                                .build()
-                        )
+                val activeTargetBearing = if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()
+                val currentCamBearing = mapViewportState.cameraState?.bearing ?: 0.0
+                val diff = kotlin.math.abs((activeTargetBearing - currentCamBearing + 540) % 360 - 180)
+                if (diff >= 0.8) {
+                    mapViewportState.setCameraOptions {
+                        bearing(activeTargetBearing)
                     }
                 }
             }
@@ -1147,11 +1145,14 @@ fun NativeMapLibreView(
                 .background(Color(0xFF0F172A).copy(alpha = 0.85f))
                 .border(1.dp, Slate700, CircleShape)
                 .clickable {
-                    isCameraLockedToUser = true
                     if (!hasLocationPermission) {
                         showLocationDisclosure = true
                         return@clickable
                     }
+                    if (isCameraLockedToUser && orientationMode == MapOrientationMode.NORTH_UP) {
+                        orientationMode = MapOrientationMode.HEADING_UP
+                    }
+                    isCameraLockedToUser = true
                     coroutineScope.launch {
                         try {
                             val loc = LocationHelper.getCurrentLocation(context)
@@ -1163,7 +1164,7 @@ fun NativeMapLibreView(
                             }
                             if (lat != 0.0 && lng != 0.0) {
                                 val targetLoc = Point.fromLngLat(lng, lat)
-                                val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0
+                                val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                                 mapViewportState.flyTo(
                                     CameraOptions.Builder()
                                         .center(targetLoc)
@@ -1176,7 +1177,7 @@ fun NativeMapLibreView(
                             val fallback = resolvedUserCoords ?: startCoords
                             if (fallback != null && fallback.first != 0.0 && fallback.second != 0.0) {
                                 val targetLoc = Point.fromLngLat(fallback.second, fallback.first)
-                                val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP && userBearing != 0f) userBearing.toDouble() else 0.0
+                                val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                                 mapViewportState.flyTo(
                                     CameraOptions.Builder()
                                         .center(targetLoc)
@@ -1193,7 +1194,7 @@ fun NativeMapLibreView(
             Icon(
                 imageVector = Icons.Default.MyLocation,
                 contentDescription = "Center live location",
-                tint = Emerald400,
+                tint = if (isCameraLockedToUser) Color(0xFF06B6D4) else Emerald400,
                 modifier = Modifier.size(22.dp)
             )
         }
