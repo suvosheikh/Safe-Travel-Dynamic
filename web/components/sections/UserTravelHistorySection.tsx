@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { DbState, TravelActivity } from '../../lib/supabase';
 import { calculateRealTripDistance, calculateTotalRealDistance, formatRealTripDuration } from '../../lib/TripDistanceCalculator';
+import { formatGmtPlus6DateTime } from '../../lib/dateTimeUtils';
 
 const TripDetailsModal = dynamic(() => import('../TripDetailsModal'), { ssr: false });
 
@@ -319,15 +320,7 @@ export default function UserTravelHistorySection({
             {filteredActivities.map(trip => {
               const isSos = db.sosRecords.some(s => s.trip_id === trip.id && s.status === 'active') || trip.safety_status === 'sos';
               const isOngoing = trip.safety_status === 'ongoing' || (!trip.end_time && !isSos);
-              const tripDate = new Date((trip.start_time || trip.created_at) as string).toLocaleDateString(undefined, {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              });
-              const tripTime = new Date((trip.start_time || trip.created_at) as string).toLocaleTimeString(undefined, {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
+              const tripFormattedDateTime = formatGmtPlus6DateTime((trip.start_time || trip.created_at) as string);
 
               const realDistance = calculateRealTripDistance(trip);
               const realDuration = formatRealTripDuration(trip);
@@ -360,7 +353,7 @@ export default function UserTravelHistorySection({
                             {trip.transport_mode || 'Transit'}
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            {tripDate} at {tripTime}
+                            {tripFormattedDateTime}
                           </span>
                         </div>
                       </div>

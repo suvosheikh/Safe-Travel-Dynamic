@@ -396,7 +396,7 @@ fun NativeMapLibreView(
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    var orientationMode by remember { mutableStateOf(MapOrientationMode.HEADING_UP) }
+    var orientationMode by remember { mutableStateOf(MapOrientationMode.NORTH_UP) }
     var isCameraLockedToUser by remember { mutableStateOf(true) }
     val deviceHeading by rememberDeviceHeading(userBearing)
 
@@ -641,21 +641,27 @@ fun NativeMapLibreView(
     }
 
     val mapViewportState = rememberMapViewportState {
-        setCameraOptions(initialCamera)
+        setCameraOptions {
+            center(initialCamera.center)
+            zoom(initialCamera.zoom ?: MapViewportCoordinator.DEFAULT_STREET_ZOOM)
+            pitch(initialCamera.pitch ?: 0.0)
+            bearing(initialCamera.bearing ?: 0.0)
+        }
     }
 
     var hasCenteredInSession by remember { mutableStateOf(false) }
 
     // Auto-center on user's current location on map load & smooth camera gliding during active travel
-    LaunchedEffect(resolvedUserCoords) {
-        if (recordedPath == null) {
+    LaunchedEffect(resolvedUserCoords, hasLocationPermission) {
+        if (recordedPath == null && hasLocationPermission) {
             resolvedUserCoords?.let { coords ->
                 if (coords.first != 0.0 && coords.second != 0.0) {
-                    val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
-                    val currentZoom = mapViewportState.cameraState?.zoom ?: 0.0
+                    val currentZoom = mapViewportState.cameraState?.zoom ?: 15.5
                     val effectiveZoom = if (currentZoom < 13.0) 15.5 else currentZoom
 
                     if (!hasCenteredInSession) {
+                        // Allow Mapbox surface 120ms to attach before triggering first smooth flight
+                        kotlinx.coroutines.delay(120)
                         hasCenteredInSession = true
                         onCenteredInitially()
                         MapViewportCoordinator.flyToLocation(
@@ -663,7 +669,7 @@ fun NativeMapLibreView(
                             lat = coords.first,
                             lng = coords.second,
                             zoom = 15.5,
-                            bearing = targetBearing
+                            bearing = 0.0
                         )
                     } else if (isCameraLockedToUser) {
                         MapViewportCoordinator.flyToLocation(
@@ -671,7 +677,7 @@ fun NativeMapLibreView(
                             lat = coords.first,
                             lng = coords.second,
                             zoom = effectiveZoom,
-                            bearing = targetBearing
+                            bearing = 0.0
                         )
                     }
                 }
@@ -698,13 +704,28 @@ fun NativeMapLibreView(
                 }
             }
     ) {
-        // Native Mapbox Compose Map (hiding ornaments and remembering style lambda to prevent constant reloads)
+        // Dynamic Top Padding for Top HUD controls:
+        // Before trip start: 12.dp (aligned at top of map area)
+        // During active trip: 88.dp (cleanly below MissionControlBar and Watching row)
+        // In Fullscreen dialog: 16.dp with statusBarsPadding
+        val topHudPadding = if (isTripActive) 88.dp else 12.dp
+        val statusPaddingModifier = if (isFullscreen) Modifier.statusBarsPadding() else Modifier
+
+        // Native Mapbox Compose Map
         MapboxMap(
             modifier = Modifier.fillMaxSize(),
             mapViewportState = mapViewportState,
-            style = remember { { MapStyle(style = "mapbox://styles/suvosheikh/cmqcnkso0000m01r6ce5y5dch") } },
+            style = { MapStyle(style = "mapbox://styles/suvosheikh/cmqcnkso0000m01r6ce5y5dch") },
             logo = {},
-            compass = {},
+            compass = {
+                Compass(
+                    modifier = Modifier
+                        .then(statusPaddingModifier)
+                        .padding(top = topHudPadding, end = 16.dp),
+                    alignment = Alignment.TopEnd,
+                    fadeWhenFacingNorth = false
+                )
+            },
             scaleBar = {},
             attribution = {},
             onMapClickListener = OnMapClickListener { point ->
@@ -732,8 +753,11 @@ fun NativeMapLibreView(
                 )
                 mapView.mapboxMap.setCamera(initCam)
 
-                // CRITICAL: When the Mapbox style finishes loading, re-enforce the camera to prevent style defaults from showing the globe
+                // CRITICAL: When the Mapbox style finishes loading, enforce 2D Mercator (No Globe) and re-enforce street-level camera
                 mapView.mapboxMap.subscribeStyleLoaded { _ ->
+                    mapView.mapboxMap.getStyle { style ->
+                        MapViewportCoordinator.enforceMercatorProjection(style)
+                    }
                     val freshCoords = resolvedUserCoords ?: LocationHelper.getLastSavedLocation(context)
                     val freshCam = MapViewportCoordinator.resolveInitialCamera(
                         context = context,
@@ -747,40 +771,16 @@ fun NativeMapLibreView(
                 }
             }
 
-            // 2. Ultra-smooth native rotation stream (Google Maps style, zero recomposition lag)
-            MapEffect(orientationMode, isCameraLockedToUser, userBearing) { mapView ->
-                if (!isCameraLockedToUser) return@MapEffect
-
-                when (orientationMode) {
-                    MapOrientationMode.HEADING_UP -> {
-                        snapshotFlow { deviceHeading }
-                            .collect { heading ->
-                                if (isCameraLockedToUser && orientationMode == MapOrientationMode.HEADING_UP) {
-                                    val currentCam = mapView.mapboxMap.cameraState
-                                    // Guard: DO NOT interrupt camera with setCamera if the camera has not yet zoomed into street level
-                                    if (currentCam.zoom >= 10.0) {
-                                        val targetBearing = if (userBearing > 0f) userBearing.toDouble() else heading.toDouble()
-                                        val diff = kotlin.math.abs(MapViewportCoordinator.calculateAngleDiff(targetBearing, currentCam.bearing))
-                                        if (diff >= 0.25) {
-                                            mapView.mapboxMap.setCamera(
-                                                CameraOptions.Builder()
-                                                    .bearing(targetBearing)
-                                                    .build()
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                    }
-                    MapOrientationMode.NORTH_UP -> {
-                        val currentCam = mapView.mapboxMap.cameraState.bearing
-                        if (kotlin.math.abs(currentCam) >= 0.5) {
-                            mapViewportState.flyTo(
-                                CameraOptions.Builder()
-                                    .bearing(0.0)
-                                    .build()
-                            )
-                        }
+            // 2. Camera bearing lock: Map stays North-Up (no rotating based on compass)
+            MapEffect(isCameraLockedToUser) { mapView ->
+                if (isCameraLockedToUser) {
+                    val currentCam = mapView.mapboxMap.cameraState.bearing
+                    if (kotlin.math.abs(currentCam) >= 0.5) {
+                        mapView.mapboxMap.setCamera(
+                            CameraOptions.Builder()
+                                .bearing(0.0)
+                                .build()
+                        )
                     }
                 }
             }
@@ -945,15 +945,25 @@ fun NativeMapLibreView(
             }
 
             // Live Traveled Trail (Breadcrumbs log from GPS/Supabase)
-            if (liveRoutePath != null && liveRoutePath.size >= 2) {
-                key("live_traveled_path_${liveRoutePath.size}") {
-                    PolylineAnnotation(
-                        points = liveRoutePath,
-                        lineColorString = "#10B981", // Emerald-500 for traveled trail
-                        lineWidth = 5.0,
-                        lineOpacity = 0.95
-                    )
+            // Locks the tip of the trail line directly to the user's puck so the line never jumps ahead of the user
+            val displayedTraveledPath = remember(liveRoutePath, userPoint) {
+                if (liveRoutePath.isNullOrEmpty()) {
+                    null
+                } else if (userPoint != null && liveRoutePath.size >= 1) {
+                    val basePoints = if (liveRoutePath.size > 1) liveRoutePath.dropLast(1) else emptyList()
+                    basePoints + userPoint
+                } else {
+                    liveRoutePath
                 }
+            }
+
+            if (displayedTraveledPath != null && displayedTraveledPath.size >= 2) {
+                PolylineAnnotation(
+                    points = displayedTraveledPath,
+                    lineColorString = "#10B981", // Emerald-500 for traveled trail
+                    lineWidth = 5.0,
+                    lineOpacity = 0.95
+                )
             }
 
             // Dynamic route polyline annotation with alternatives
@@ -1047,12 +1057,6 @@ fun NativeMapLibreView(
             }
         }
 
-        // Dynamic Top Padding for Top HUD controls:
-        // Before trip start: 12.dp (aligned at top of map area)
-        // During active trip: 88.dp (cleanly below MissionControlBar and Watching row)
-        // In Fullscreen dialog: 16.dp with statusBarsPadding
-        val topHudPadding = if (isTripActive) 88.dp else 12.dp
-        val statusPaddingModifier = if (isFullscreen) Modifier.statusBarsPadding() else Modifier
 
         // Custom Overlay UI: Top-Left Controls (FullScreen Entry/Exit)
         Box(
@@ -1078,108 +1082,6 @@ fun NativeMapLibreView(
             )
         }
 
-        // Custom Overlay UI: Top-Right Controls (Compass & Heading/North Orientation)
-        val currentCameraBearing = mapViewportState.cameraState?.bearing ?: 0.0
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .then(statusPaddingModifier)
-                .padding(top = topHudPadding, end = 16.dp)
-                .shadow(6.dp, CircleShape)
-                .size(46.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF0F172A).copy(alpha = 0.88f))
-                .border(
-                    width = 1.2.dp,
-                    color = if (orientationMode == MapOrientationMode.HEADING_UP) Color(0xFF06B6D4) else Slate700,
-                    shape = CircleShape
-                )
-                .clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    isCameraLockedToUser = true
-                    if (orientationMode == MapOrientationMode.HEADING_UP) {
-                        orientationMode = MapOrientationMode.NORTH_UP
-                        mapViewportState.flyTo(
-                            CameraOptions.Builder()
-                                .bearing(0.0)
-                                .build()
-                        )
-                    } else {
-                        orientationMode = MapOrientationMode.HEADING_UP
-                        val targetBearing = if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()
-                        mapViewportState.flyTo(
-                            CameraOptions.Builder()
-                                .bearing(targetBearing)
-                                .build()
-                        )
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Vector Compass Needle
-                Canvas(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .rotate(if (orientationMode == MapOrientationMode.HEADING_UP) (-deviceHeading) else (-currentCameraBearing).toFloat())
-                ) {
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    val needleHalfWidth = size.width * 0.18f
-                    val needleLength = size.height * 0.44f
-
-                    // North Needle (Red Faceted)
-                    val northLeftPath = Path().apply {
-                        moveTo(cx, cy - needleLength)
-                        lineTo(cx - needleHalfWidth, cy)
-                        lineTo(cx, cy)
-                        close()
-                    }
-                    drawPath(northLeftPath, color = Color(0xFFEF4444))
-
-                    val northRightPath = Path().apply {
-                        moveTo(cx, cy - needleLength)
-                        lineTo(cx + needleHalfWidth, cy)
-                        lineTo(cx, cy)
-                        close()
-                    }
-                    drawPath(northRightPath, color = Color(0xFFDC2626))
-
-                    // South Needle (Slate Faceted)
-                    val southLeftPath = Path().apply {
-                        moveTo(cx, cy + needleLength)
-                        lineTo(cx - needleHalfWidth, cy)
-                        lineTo(cx, cy)
-                        close()
-                    }
-                    drawPath(southLeftPath, color = Color(0xFF94A3B8))
-
-                    val southRightPath = Path().apply {
-                        moveTo(cx, cy + needleLength)
-                        lineTo(cx + needleHalfWidth, cy)
-                        lineTo(cx, cy)
-                        close()
-                    }
-                    drawPath(southRightPath, color = Color(0xFF64748B))
-
-                    // Center pivot point
-                    drawCircle(color = Color.White, radius = 2.5.dp.toPx(), center = androidx.compose.ui.geometry.Offset(cx, cy))
-                    drawCircle(color = Color(0xFF0F172A), radius = 1.2.dp.toPx(), center = androidx.compose.ui.geometry.Offset(cx, cy))
-                }
-
-                Text(
-                    text = if (orientationMode == MapOrientationMode.HEADING_UP) "HDG" else "N",
-                    color = if (orientationMode == MapOrientationMode.HEADING_UP) Color(0xFF06B6D4) else Color(0xFFEF4444),
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Black,
-                    lineHeight = 7.sp
-                )
-            }
-        }
 
         // Custom Overlay UI: Center on current user location trigger
         val coroutineScope = rememberCoroutineScope()
@@ -1198,10 +1100,8 @@ fun NativeMapLibreView(
                         showLocationDisclosure = true
                         return@clickable
                     }
-                    if (isCameraLockedToUser && orientationMode == MapOrientationMode.NORTH_UP) {
-                        orientationMode = MapOrientationMode.HEADING_UP
-                    }
                     isCameraLockedToUser = true
+                    orientationMode = MapOrientationMode.NORTH_UP
                     coroutineScope.launch {
                         try {
                             val loc = LocationHelper.getCurrentLocation(context)
@@ -1213,12 +1113,11 @@ fun NativeMapLibreView(
                             }
                             if (lat != 0.0 && lng != 0.0) {
                                 val targetLoc = Point.fromLngLat(lng, lat)
-                                val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                                 mapViewportState.flyTo(
                                     CameraOptions.Builder()
                                         .center(targetLoc)
                                         .zoom(15.5)
-                                        .bearing(targetBearing)
+                                        .bearing(0.0)
                                         .build()
                                 )
                             }
@@ -1226,12 +1125,11 @@ fun NativeMapLibreView(
                             val fallback = resolvedUserCoords ?: startCoords
                             if (fallback != null && fallback.first != 0.0 && fallback.second != 0.0) {
                                 val targetLoc = Point.fromLngLat(fallback.second, fallback.first)
-                                val targetBearing = if (orientationMode == MapOrientationMode.HEADING_UP) (if (userBearing > 0f) userBearing.toDouble() else deviceHeading.toDouble()) else 0.0
                                 mapViewportState.flyTo(
                                     CameraOptions.Builder()
                                         .center(targetLoc)
                                         .zoom(15.0)
-                                        .bearing(targetBearing)
+                                        .bearing(0.0)
                                         .build()
                                 )
                             }

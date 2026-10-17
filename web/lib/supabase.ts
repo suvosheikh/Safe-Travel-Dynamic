@@ -7,6 +7,7 @@ export interface Profile {
   full_name: string;
   is_premium: boolean;
   trip_credits: number;
+  credits_valid_until?: string | null;
   points_balance: number;
   role: 'admin' | 'dispatcher' | 'user';
   sos_settings?: any;
@@ -17,8 +18,10 @@ export interface Profile {
 export interface SubscriptionPlan {
   id: string;
   name: string;
-  billing_period: 'monthly' | 'quarterly' | 'yearly' | string;
+  plan_type?: 'time_pass' | 'trip_credits';
+  billing_period: 'monthly' | 'quarterly' | 'yearly' | 'pay_per_trip' | 'custom' | string;
   duration_days: number;
+  credits_count?: number;
   price: number;
   discount_price?: number | null;
   currency: string;
@@ -29,15 +32,38 @@ export interface SubscriptionPlan {
   created_at?: string;
 }
 
+export interface PromoCode {
+  id: string;
+  code: string;
+  discount_type: 'percent' | 'fixed' | 'bonus_days' | 'bonus_credits';
+  discount_value: number;
+  bonus_days: number;
+  bonus_credits: number;
+  min_order_amount?: number;
+  max_discount_amount?: number | null;
+  applicable_plan_types?: string[];
+  max_uses?: number | null;
+  used_count: number;
+  valid_until?: string | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
 export interface PaymentTransaction {
   id: string;
   user_id: string;
   plan_id?: string | null;
+  plan_type?: string;
+  credits_count?: number;
   amount: number;
   currency: string;
   payment_method: 'bkash' | 'nagad' | 'rocket' | string;
   sender_number: string;
   transaction_id: string;
+  promo_code?: string | null;
+  discount_amount?: number;
+  bonus_days?: number;
+  bonus_credits?: number;
   status: 'pending' | 'approved' | 'rejected';
   admin_notes?: string | null;
   reviewed_by?: string | null;
@@ -45,7 +71,7 @@ export interface PaymentTransaction {
   created_at: string;
   // joined/enriched fields
   profiles?: { full_name?: string; phone_number?: string; email?: string } | null;
-  subscription_plans?: { name?: string; duration_days?: number } | null;
+  subscription_plans?: { name?: string; duration_days?: number; plan_type?: string; credits_count?: number } | null;
 }
 
 
@@ -335,6 +361,7 @@ export type DbState = {
   guardians?: Guardian[];
   subscriptionPlans?: SubscriptionPlan[];
   paymentTransactions?: PaymentTransaction[];
+  promoCodes?: PromoCode[];
 };
 
 const INITIAL_BANNERS: Banner[] = [];
@@ -535,7 +562,7 @@ export function getSupabaseClient() {
 
 export const fetchInitialData = async (supabase: any): Promise<Partial<DbState>> => {
   try {
-    const [profilesRes, activitiesRes, sosRes, bannersRes, audioLogsRes, remoteConfigsRes, guardiansRes, plansRes, txsRes] = await Promise.all([
+    const [profilesRes, activitiesRes, sosRes, bannersRes, audioLogsRes, remoteConfigsRes, guardiansRes, plansRes, txsRes, promoRes] = await Promise.all([
       supabase.from("profiles").select("*"),
       supabase.from("travel_activities").select("*"),
       supabase.from("sos_records").select("*"),
@@ -544,7 +571,8 @@ export const fetchInitialData = async (supabase: any): Promise<Partial<DbState>>
       supabase.from("app_remote_configs").select("*"),
       supabase.from("guardians").select("*"),
       supabase.from("subscription_plans").select("*").order("display_order", { ascending: true }),
-      supabase.from("payment_transactions").select("*, profiles:profiles!payment_transactions_user_id_fkey(full_name, phone_number), subscription_plans(name, duration_days)").order("created_at", { ascending: false })
+      supabase.from("payment_transactions").select("*, profiles:profiles!payment_transactions_user_id_fkey(full_name, phone_number), subscription_plans(name, duration_days, plan_type, credits_count)").order("created_at", { ascending: false }),
+      supabase.from("promo_codes").select("*").order("created_at", { ascending: false }).catch(() => ({ data: [] }))
     ]);
 
     const profiles = profilesRes.data || [];
@@ -555,6 +583,7 @@ export const fetchInitialData = async (supabase: any): Promise<Partial<DbState>>
     const guardians = guardiansRes.data || [];
     const subscriptionPlans = plansRes.data || [];
     const paymentTransactions = txsRes.data || [];
+    const promoCodes = promoRes?.data || [];
     const remoteConfigsList = remoteConfigsRes.data || [];
     const remoteConfigsMap: Record<string, string> = {};
     remoteConfigsList.forEach((rc: any) => {
@@ -669,6 +698,7 @@ export const fetchInitialData = async (supabase: any): Promise<Partial<DbState>>
         full_name: p.full_name || "Unknown User",
         is_premium: p.is_premium || false,
         trip_credits: p.trip_credits || 0,
+        credits_valid_until: p.credits_valid_until || null,
         points_balance: p.points_balance || 0,
         role: p.role || "user",
         avatar_url: p.avatar_url || null,
@@ -723,8 +753,10 @@ export const fetchInitialData = async (supabase: any): Promise<Partial<DbState>>
       subscriptionPlans: subscriptionPlans.map((p: any) => ({
         id: p.id,
         name: p.name,
+        plan_type: p.plan_type || (p.billing_period === 'pay_per_trip' ? 'trip_credits' : 'time_pass'),
         billing_period: p.billing_period || 'monthly',
-        duration_days: p.duration_days || 30,
+        duration_days: Number(p.duration_days || 30),
+        credits_count: Number(p.credits_count || 0),
         price: Number(p.price || 0),
         discount_price: p.discount_price != null ? Number(p.discount_price) : null,
         currency: p.currency || 'BDT',
@@ -734,15 +766,37 @@ export const fetchInitialData = async (supabase: any): Promise<Partial<DbState>>
         display_order: p.display_order || 1,
         created_at: p.created_at
       })),
+      promoCodes: (promoCodes || []).map((pc: any) => ({
+        id: pc.id,
+        code: pc.code,
+        discount_type: pc.discount_type || 'percent',
+        discount_value: Number(pc.discount_value || 0),
+        bonus_days: Number(pc.bonus_days || 0),
+        bonus_credits: Number(pc.bonus_credits || 0),
+        min_order_amount: Number(pc.min_order_amount || 0),
+        max_discount_amount: pc.max_discount_amount != null ? Number(pc.max_discount_amount) : null,
+        applicable_plan_types: Array.isArray(pc.applicable_plan_types) ? pc.applicable_plan_types : ['time_pass', 'trip_credits'],
+        max_uses: pc.max_uses != null ? Number(pc.max_uses) : null,
+        used_count: Number(pc.used_count || 0),
+        valid_until: pc.valid_until || null,
+        is_active: Boolean(pc.is_active),
+        created_at: pc.created_at
+      })),
       paymentTransactions: paymentTransactions.map((tx: any) => ({
         id: tx.id,
         user_id: tx.user_id,
         plan_id: tx.plan_id,
+        plan_type: tx.plan_type || (tx.subscription_plans?.plan_type || 'time_pass'),
+        credits_count: Number(tx.credits_count || tx.subscription_plans?.credits_count || 0),
         amount: Number(tx.amount || 0),
         currency: tx.currency || 'BDT',
         payment_method: tx.payment_method || 'bkash',
         sender_number: tx.sender_number || '',
         transaction_id: tx.transaction_id || '',
+        promo_code: tx.promo_code || null,
+        discount_amount: Number(tx.discount_amount || 0),
+        bonus_days: Number(tx.bonus_days || 0),
+        bonus_credits: Number(tx.bonus_credits || 0),
         status: tx.status || 'pending',
         admin_notes: tx.admin_notes || null,
         reviewed_by: tx.reviewed_by || null,

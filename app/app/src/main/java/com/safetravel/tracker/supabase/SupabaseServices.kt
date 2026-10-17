@@ -281,6 +281,15 @@ interface SupabaseDbService {
         @Header("Prefer") prefer: String = "return=representation"
     ): Response<List<SupabasePaymentTransaction>>
 
+    // Promo Codes
+    @GET("rest/v1/promo_codes")
+    suspend fun getPromoCode(
+        @Header("Authorization") userAuth: String,
+        @Query("code") codeQuery: String,
+        @Query("is_active") isActive: String = "eq.true",
+        @Query("select") select: String = "*"
+    ): Response<List<SupabasePromoCode>>
+
     // App Version Logs
     @GET("rest/v1/app_version_logs")
     suspend fun getVersionLogs(
@@ -288,5 +297,19 @@ interface SupabaseDbService {
         @Query("select") select: String = "*",
         @Query("order") order: String = "version_code.desc"
     ): Response<List<SupabaseVersionLog>>
+
+    // User Preferences (Timezone & Settings)
+    @GET("rest/v1/user_preferences")
+    suspend fun getUserPreferences(
+        @Header("Authorization") userAuth: String,
+        @Query("user_id") userIdQuery: String
+    ): Response<List<SupabaseUserPreference>>
+
+    @POST("rest/v1/user_preferences")
+    suspend fun upsertUserPreferences(
+        @Body body: Map<String, @JvmSuppressWildcards Any>,
+        @Header("Authorization") userAuth: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates"
+    ): Response<Unit>
 }
 

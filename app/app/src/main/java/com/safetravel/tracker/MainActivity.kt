@@ -166,6 +166,16 @@ class MainActivity : ComponentActivity() {
                                 MainTabbedLayout(vm)
                             }
                         }
+
+                        // Floating dynamic capsule toast banner across all screens
+                        val currentToast by vm.currentToastBanner.collectAsState()
+                        CustomToastHost(
+                            toastData = currentToast,
+                            onDismiss = { vm.dismissToast() },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .zIndex(999f)
+                        )
                     }
                 }
             }

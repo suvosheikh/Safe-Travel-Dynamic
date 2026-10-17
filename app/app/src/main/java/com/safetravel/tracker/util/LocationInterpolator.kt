@@ -58,9 +58,14 @@ fun rememberSmoothLocation(
 
     var currentDisplayCoords by remember { mutableStateOf(targetCoords) }
     var previousTarget by remember { mutableStateOf(targetCoords) }
+    var lastUpdateTimeMs by remember { mutableLongStateOf(0L) }
     val animProgress = remember { Animatable(1f) }
 
     LaunchedEffect(targetCoords) {
+        val now = System.currentTimeMillis()
+        val delta = if (lastUpdateTimeMs > 0L) (now - lastUpdateTimeMs).toInt() else animationDurationMs
+        lastUpdateTimeMs = now
+
         val prev = previousTarget
         previousTarget = targetCoords
 
@@ -77,6 +82,8 @@ fun rememberSmoothLocation(
             return@LaunchedEffect
         }
 
+        // Dynamically match animation duration to the actual incoming GPS fix interval (800ms - 2500ms)
+        val effectiveDuration = delta.coerceIn(800, 2500)
         val startLat = currentDisplayCoords.first
         val startLng = currentDisplayCoords.second
 
@@ -84,7 +91,7 @@ fun rememberSmoothLocation(
         animProgress.animateTo(
             targetValue = 1f,
             animationSpec = tween(
-                durationMillis = animationDurationMs,
+                durationMillis = effectiveDuration,
                 easing = LinearEasing
             )
         ) {

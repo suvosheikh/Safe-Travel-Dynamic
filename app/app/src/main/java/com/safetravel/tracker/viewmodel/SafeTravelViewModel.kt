@@ -32,6 +32,8 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.cos
 import kotlin.math.sin
+import com.safetravel.tracker.ui.components.ToastBannerData
+import com.safetravel.tracker.ui.components.ToastType
 
 data class EmergencyContact(
     val id: String,
@@ -79,6 +81,9 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     val incomingTripShares = MutableStateFlow<List<SupabaseTripShare>>(emptyList())
     val selectedSharedTrip = MutableStateFlow<SupabaseTrip?>(null)
     val activeHeadsUpAlert = MutableStateFlow<HeadsUpAlert?>(null)
+    val guardianCenterSelectedTab = MutableStateFlow(0)
+    var hasAutoSwitchedGuardianTab = false
+    private var observeSharedTripJob: Job? = null
 
     // Emergency Search Logic
     val emergencySearchQuery = MutableStateFlow("")
@@ -104,6 +109,25 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     val isAudioUploading = MutableStateFlow(false)
     val safetyAudioLogs = MutableStateFlow<List<com.safetravel.tracker.supabase.SupabaseSafetyAudioLog>>(emptyList())
     val actionFeedbackMessage = MutableStateFlow<String?>(null)
+    val currentToastBanner = MutableStateFlow<ToastBannerData?>(null)
+
+    fun showToast(
+        message: String,
+        title: String? = null,
+        type: ToastType = ToastType.INFO,
+        durationMs: Long = 3500L
+    ) {
+        currentToastBanner.value = ToastBannerData(
+            message = message,
+            title = title,
+            type = type,
+            durationMs = durationMs
+        )
+    }
+
+    fun dismissToast() {
+        currentToastBanner.value = null
+    }
 
     val vehiclePhotoUrl = MutableStateFlow<String?>(null)
     val isVehiclePhotoUploading = MutableStateFlow(false)
@@ -560,6 +584,21 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
         }
+
+        // 5. Automatically route action feedback messages to modern CustomToastBanner
+        viewModelScope.launch {
+            actionFeedbackMessage.collectLatest { msg ->
+                if (!msg.isNullOrBlank()) {
+                    val type = when {
+                        msg.contains("fail", ignoreCase = true) || msg.contains("error", ignoreCase = true) || msg.contains("red alert", ignoreCase = true) -> ToastType.ERROR
+                        msg.contains("warning", ignoreCase = true) || msg.contains("required", ignoreCase = true) || msg.contains("attention", ignoreCase = true) -> ToastType.WARNING
+                        msg.contains("success", ignoreCase = true) || msg.contains("resolved", ignoreCase = true) || msg.contains("secured", ignoreCase = true) || msg.contains("synchronized", ignoreCase = true) || msg.contains("updated", ignoreCase = true) || msg.contains("saved", ignoreCase = true) -> ToastType.SUCCESS
+                        else -> ToastType.INFO
+                    }
+                    showToast(message = msg, type = type)
+                }
+            }
+        }
     }
 
     fun submitAuthentication() {
@@ -643,6 +682,12 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                 result.onSuccess { profile ->
                     userProfile.value = profile
                     android.util.Log.d("SafeTravelViewModel", "Session restored successfully: ${profile.fullName}")
+                    viewModelScope.launch {
+                        val prefRes = SupabaseManager.fetchUserPreference(profile.id)
+                        prefRes.getOrNull()?.timezone?.let { tz ->
+                            DateTimeUtils.setUserTimeZone(getApplication(), tz)
+                        }
+                    }
                     refreshData()
                 }.onFailure {
                     android.util.Log.e("SafeTravelViewModel", "Failed to restore session online: ${it.message}", it)
@@ -933,6 +978,16 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                 stopSosSafetyCheckLoop()
                 SupabaseRealtimeBroadcaster.disconnectTrip()
 
+                // Determine trip credits deduction based on priority rule:
+                // Active time pass holders have unlimited coverage (0 credits deducted).
+                // Non-pass holders with valid trip credits consume 1 credit.
+                val deductCredit = com.safetravel.tracker.util.SubscriptionHelper.shouldDeductTripCredit(profile)
+                val newCredits = if (deductCredit) {
+                    (profile.tripCredits - 1).coerceAtLeast(0)
+                } else {
+                    profile.tripCredits
+                }
+
                 // Reward standard or premium bonus points dynamically based on Admin Remote Configs
                 val isEngineActive = SupabaseManager.getRemoteConfig("points_engine_enabled", "true") != "false"
                 if (isEngineActive) {
@@ -947,18 +1002,24 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
 
                     val totalReward = baseReward + distanceBonus
                     val newPoints = profile.pointsBalance + totalReward
-                    val newCredits = profile.tripCredits + 1
 
-                    SupabaseManager.updateProfileFields(
-                        profile.id,
-                        mapOf("points_balance" to newPoints, "trip_credits" to newCredits)
-                    )
+                    val updateMap = mutableMapOf<String, Any>("points_balance" to newPoints)
+                    if (deductCredit) {
+                        updateMap["trip_credits"] = newCredits
+                    }
+                    SupabaseManager.updateProfileFields(profile.id, updateMap)
 
                     val bonusNote = if (distanceBonus > 0) " (includes $distanceBonus KM distance bonus)" else ""
-                    SupabaseManager.logPoints(profile.id, totalReward, "Trip completed safely: $cleanFinalEnd$bonusNote")
-                    actionFeedbackMessage.value = "Trip completed safely! +$totalReward points earned!"
+                    val creditNote = if (deductCredit) " (1 Trip Credit used, $newCredits left)" else ""
+                    SupabaseManager.logPoints(profile.id, totalReward, "Trip completed safely: $cleanFinalEnd$bonusNote$creditNote")
+                    actionFeedbackMessage.value = "Trip completed safely! +$totalReward points earned!$creditNote"
                 } else {
-                    actionFeedbackMessage.value = "Trip completed safely!"
+                    if (deductCredit) {
+                        SupabaseManager.updateProfileFields(profile.id, mapOf("trip_credits" to newCredits))
+                        actionFeedbackMessage.value = "Trip completed safely! (1 Trip Credit used, $newCredits left)"
+                    } else {
+                        actionFeedbackMessage.value = "Trip completed safely!"
+                    }
                 }
                 syncProfile()
                 refreshData()
@@ -1187,16 +1248,17 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun observeSharedTrip(tripId: String) {
+        // Cancel any running polling job from a previous trip observation immediately!
+        observeSharedTripJob?.cancel()
+
         // Immediate local lookup to prevent screen load latency
         val localTrip = incomingTripShares.value.find { it.tripId == tripId }?.tripDetails
             ?: pastTrips.value.find { it.id == tripId }
             ?: activeTrip.value?.takeIf { it.id == tripId }
 
-        if (localTrip != null) {
-            selectedSharedTrip.value = localTrip
-        }
+        selectedSharedTrip.value = localTrip
 
-        viewModelScope.launch {
+        observeSharedTripJob = viewModelScope.launch {
             while (isActive) {
                 SupabaseManager.fetchTripById(tripId).onSuccess { trip ->
                     selectedSharedTrip.value = trip
@@ -1204,6 +1266,12 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                 delay(4000) // Poll every 4 seconds for live tracking
             }
         }
+    }
+
+    fun stopObservingSharedTrip() {
+        observeSharedTripJob?.cancel()
+        observeSharedTripJob = null
+        selectedSharedTrip.value = null
     }
 
     fun loadInitialContent() {

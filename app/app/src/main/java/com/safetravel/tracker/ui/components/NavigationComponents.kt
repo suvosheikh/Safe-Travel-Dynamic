@@ -1,9 +1,11 @@
 package com.safetravel.tracker.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -151,10 +154,15 @@ fun BarItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pillBg by animateColorAsState(
-        targetValue = if (selected) selectedColor.copy(alpha = 0.16f) else Color.Transparent,
-        animationSpec = tween(durationMillis = 200),
-        label = "pillBg"
+    val pillBgAlpha by animateFloatAsState(
+        targetValue = if (selected) 0.22f else 0.0f,
+        animationSpec = tween(durationMillis = 220),
+        label = "pillBgAlpha"
+    )
+    val pillBorderAlpha by animateFloatAsState(
+        targetValue = if (selected) 0.45f else 0.0f,
+        animationSpec = tween(durationMillis = 220),
+        label = "pillBorderAlpha"
     )
     val animatedIconTint by animateColorAsState(
         targetValue = if (selected) selectedColor else unselectedColor,
@@ -162,7 +170,7 @@ fun BarItem(
         label = "iconTint"
     )
     val pillWidth by animateDpAsState(
-        targetValue = if (selected) 46.dp else 32.dp,
+        targetValue = if (selected) 48.dp else 32.dp,
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 500f),
         label = "pillWidth"
     )
@@ -178,9 +186,30 @@ fun BarItem(
         Box(
             modifier = Modifier
                 .width(pillWidth)
-                .height(28.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(pillBg),
+                .height(30.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(
+                    if (selected) {
+                        Brush.verticalGradient(
+                            listOf(
+                                selectedColor.copy(alpha = pillBgAlpha * 1.25f),
+                                selectedColor.copy(alpha = pillBgAlpha * 0.60f)
+                            )
+                        )
+                    } else {
+                        Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                    }
+                )
+                .border(
+                    width = if (selected) 1.dp else 0.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = pillBorderAlpha * 0.70f),
+                            selectedColor.copy(alpha = pillBorderAlpha)
+                        )
+                    ),
+                    shape = RoundedCornerShape(15.dp)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(

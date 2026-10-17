@@ -60,7 +60,8 @@ data class SupabaseProfile(
     @Json(name = "height_weight") val heightWeight: String? = null,
     @Json(name = "special_needs") val specialNeeds: String? = null,
     @Json(name = "sos_settings") val sosSettings: Map<String, Any>? = null,
-    @Json(name = "premium_until") val premiumUntil: String? = null
+    @Json(name = "premium_until") val premiumUntil: String? = null,
+    @Json(name = "credits_valid_until") val creditsValidUntil: String? = null
 )
 
 data class Guardian(
@@ -250,8 +251,10 @@ data class SupabaseTripShare(
 data class SupabaseSubscriptionPlan(
     @Json(name = "id") val id: String,
     @Json(name = "name") val name: String,
+    @Json(name = "plan_type") val planType: String = "time_pass", // "time_pass" or "trip_credits"
     @Json(name = "billing_period") val billingPeriod: String = "monthly",
     @Json(name = "duration_days") val durationDays: Int = 30,
+    @Json(name = "credits_count") val creditsCount: Int = 0,
     @Json(name = "price") val price: Double = 0.0,
     @Json(name = "discount_price") val discountPrice: Double? = null,
     @Json(name = "currency") val currency: String = "BDT",
@@ -261,15 +264,37 @@ data class SupabaseSubscriptionPlan(
     @Json(name = "display_order") val displayOrder: Int = 1
 )
 
+data class SupabasePromoCode(
+    @Json(name = "id") val id: String,
+    @Json(name = "code") val code: String,
+    @Json(name = "discount_type") val discountType: String = "percent", // "percent", "fixed", "bonus_days", "bonus_credits"
+    @Json(name = "discount_value") val discountValue: Double = 0.0,
+    @Json(name = "bonus_days") val bonusDays: Int = 0,
+    @Json(name = "bonus_credits") val bonusCredits: Int = 0,
+    @Json(name = "min_order_amount") val minOrderAmount: Double = 0.0,
+    @Json(name = "max_discount_amount") val maxDiscountAmount: Double? = null,
+    @Json(name = "applicable_plan_types") val applicablePlanTypes: List<String> = emptyList(),
+    @Json(name = "max_uses") val maxUses: Int? = null,
+    @Json(name = "used_count") val usedCount: Int = 0,
+    @Json(name = "valid_until") val validUntil: String? = null,
+    @Json(name = "is_active") val isActive: Boolean = true
+)
+
 data class SupabasePaymentTransaction(
     @Json(name = "id") val id: String? = null,
     @Json(name = "user_id") val userId: String,
     @Json(name = "plan_id") val planId: String? = null,
+    @Json(name = "plan_type") val planType: String? = "time_pass",
+    @Json(name = "credits_count") val creditsCount: Int? = 0,
     @Json(name = "amount") val amount: Double = 0.0,
     @Json(name = "currency") val currency: String = "BDT",
     @Json(name = "payment_method") val paymentMethod: String = "bkash",
     @Json(name = "sender_number") val senderNumber: String,
     @Json(name = "transaction_id") val transactionId: String,
+    @Json(name = "promo_code") val promoCode: String? = null,
+    @Json(name = "discount_amount") val discountAmount: Double? = 0.0,
+    @Json(name = "bonus_days") val bonusDays: Int? = 0,
+    @Json(name = "bonus_credits") val bonusCredits: Int? = 0,
     @Json(name = "status") val status: String = "pending",
     @Json(name = "admin_notes") val adminNotes: String? = null,
     @Json(name = "created_at") val createdAt: String? = null
@@ -284,5 +309,14 @@ data class SupabaseVersionLog(
     @Json(name = "is_critical") val isCritical: Boolean? = false,
     @Json(name = "download_url") val downloadUrl: String? = null,
     @Json(name = "created_at") val createdAt: String? = null
+)
+
+data class SupabaseUserPreference(
+    @Json(name = "id") val id: String? = null,
+    @Json(name = "user_id") val userId: String,
+    @Json(name = "timezone") val timezone: String = "Asia/Dhaka",
+    @Json(name = "date_format") val dateFormat: String = "dd MMM yyyy hh:mm a",
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null
 )
 

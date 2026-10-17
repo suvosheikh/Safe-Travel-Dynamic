@@ -39,7 +39,10 @@ import com.safetravel.tracker.ui.components.GlassBottomSheetContainer
 import com.safetravel.tracker.supabase.SupabaseManager
 import com.safetravel.tracker.supabase.SupabasePaymentTransaction
 import com.safetravel.tracker.supabase.SupabaseSubscriptionPlan
+import com.safetravel.tracker.supabase.SupabasePromoCode
 import com.safetravel.tracker.ui.theme.*
+import com.safetravel.tracker.util.DateTimeUtils
+import com.safetravel.tracker.util.SubscriptionHelper
 import com.safetravel.tracker.viewmodel.SafeTravelViewModel
 import kotlinx.coroutines.launch
 
@@ -63,12 +66,22 @@ fun PremiumScreen(
     var userTransactions by remember { mutableStateOf<List<SupabasePaymentTransaction>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
+    // Segmented tab: "time_pass" or "trip_credits"
+    var selectedPlanTab by remember { mutableStateOf("time_pass") }
+
     // Selected plan for checkout modal
     var checkoutPlan by remember { mutableStateOf<SupabaseSubscriptionPlan?>(null) }
     var selectedMethod by remember { mutableStateOf("bkash") }
     var senderNumber by remember { mutableStateOf("") }
     var transactionId by remember { mutableStateOf("") }
     var isSubmittingPayment by remember { mutableStateOf(false) }
+
+    // Promo Code Checkout State
+    var enteredPromoCode by remember { mutableStateOf("") }
+    var appliedPromo by remember { mutableStateOf<SupabasePromoCode?>(null) }
+    var isVerifyingPromo by remember { mutableStateOf(false) }
+    var promoFeedback by remember { mutableStateOf<String?>(null) }
+    var promoFeedbackIsError by remember { mutableStateOf(false) }
 
     // Fetch initial data
     LaunchedEffect(Unit) {
@@ -88,6 +101,20 @@ fun PremiumScreen(
     }
 
     val pendingTx = userTransactions.firstOrNull { it.status == "pending" }
+    val latestApprovedTx = userTransactions.firstOrNull { it.status == "approved" }
+    val currentActivePlan = if (isPremium) {
+        plans.firstOrNull { it.id == latestApprovedTx?.planId } ?: plans.firstOrNull()
+    } else null
+
+    val daysRemaining = remember(premiumUntil) {
+        val expDate = DateTimeUtils.parseIsoToDate(premiumUntil)
+        if (expDate != null) {
+            val diff = expDate.time - System.currentTimeMillis()
+            (diff / (1000L * 60 * 60 * 24)).coerceAtLeast(0L)
+        } else null
+    }
+
+    var switchPlanConfirmation by remember { mutableStateOf<SupabaseSubscriptionPlan?>(null) }
 
     // Admin Numbers from Remote Config
     val bkashNum = remember { SupabaseManager.getCachedConfig("payment_manual_bkash", "01700000000") }
@@ -114,8 +141,8 @@ fun PremiumScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 24.dp, bottom = 40.dp),
+                .padding(horizontal = 14.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Top Navigation & Title
@@ -156,7 +183,7 @@ fun PremiumScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
             // Membership Status Card
@@ -170,12 +197,12 @@ fun PremiumScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(18.dp),
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(50.dp)
+                                .size(46.dp)
                                 .clip(CircleShape)
                                 .background(
                                     if (isPremium) Brush.radialGradient(listOf(PremiumGold, Color(0xFFD97706)))
@@ -187,11 +214,11 @@ fun PremiumScreen(
                                 imageVector = if (isPremium) Icons.Default.WorkspacePremium else Icons.Default.Shield,
                                 contentDescription = null,
                                 tint = if (isPremium) Slate950 else Slate300,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -202,13 +229,22 @@ fun PremiumScreen(
                             )
 
                             if (isPremium && !premiumUntil.isNullOrBlank()) {
+                                val formattedExp = DateTimeUtils.formatAppDateTime(premiumUntil)
                                 Text(
-                                    text = "Valid Until: $premiumUntil",
+                                    text = "Valid Until: $formattedExp",
                                     fontSize = 11.sp,
                                     color = Emerald400,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
+                                if (daysRemaining != null) {
+                                    Text(
+                                        text = "$daysRemaining Days Coverage Remaining",
+                                        fontSize = 10.sp,
+                                        color = Slate400,
+                                        modifier = Modifier.padding(top = 1.dp)
+                                    )
+                                }
                             } else {
                                 Text(
                                     text = "Upgrade for unlimited protection & priority response.",
@@ -217,11 +253,32 @@ fun PremiumScreen(
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
+
+                            if ((profile?.tripCredits ?: 0) > 0) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DirectionsCar,
+                                        contentDescription = null,
+                                        tint = Cyan400,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${profile?.tripCredits} Trip Credits Available",
+                                        fontSize = 11.sp,
+                                        color = Cyan400,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // Pending Transaction Alert Card
@@ -333,7 +390,7 @@ fun PremiumScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(22.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
@@ -345,20 +402,102 @@ fun PremiumScreen(
                 ) {
                     Text(
                         text = "Choose Your",
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Safety Plan",
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = PremiumGold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            // Segmented Filter Tabs: Time Passes vs Trip Credit Packs
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Slate850, RoundedCornerShape(14.dp))
+                        .border(1.dp, Slate700, RoundedCornerShape(14.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val isPassTab = selectedPlanTab == "time_pass"
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { selectedPlanTab = "time_pass" },
+                        color = if (isPassTab) Cyan500.copy(alpha = 0.2f) else Color.Transparent,
+                        border = if (isPassTab) BorderStroke(1.dp, Cyan400) else null
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = if (isPassTab) Cyan400 else Slate400,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Safety Passes",
+                                fontSize = 12.sp,
+                                fontWeight = if (isPassTab) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isPassTab) Color.White else Slate400
+                            )
+                        }
+                    }
+
+                    val isTripTab = selectedPlanTab == "trip_credits"
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { selectedPlanTab = "trip_credits" },
+                        color = if (isTripTab) Emerald400.copy(alpha = 0.2f) else Color.Transparent,
+                        border = if (isTripTab) BorderStroke(1.dp, Emerald400) else null
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsCar,
+                                contentDescription = null,
+                                tint = if (isTripTab) Emerald400 else Slate400,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Trip Credit Packs",
+                                fontSize = 12.sp,
+                                fontWeight = if (isTripTab) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isTripTab) Color.White else Slate400
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            val displayedPlans = plans.filter { plan ->
+                if (selectedPlanTab == "trip_credits") {
+                    plan.planType == "trip_credits" || plan.billingPeriod == "pay_per_trip"
+                } else {
+                    plan.planType != "trip_credits" && plan.billingPeriod != "pay_per_trip"
+                }
             }
 
             // Plans List
@@ -367,44 +506,51 @@ fun PremiumScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(150.dp),
+                            .height(120.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
                             color = Cyan400,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     }
                 }
-            } else if (plans.isEmpty()) {
+            } else if (displayedPlans.isEmpty()) {
                 item {
                     Text(
-                        text = "No subscription plans available at this moment.",
+                        text = if (selectedPlanTab == "trip_credits") "No trip credit packs available right now." else "No safety passes available right now.",
                         fontSize = 12.sp,
                         color = Slate400,
-                        modifier = Modifier.padding(vertical = 30.dp)
+                        modifier = Modifier.padding(vertical = 20.dp)
                     )
                 }
             } else {
-                items(plans) { plan ->
+                items(displayedPlans) { plan ->
                     val hasDiscount = plan.discountPrice != null && plan.discountPrice < plan.price
                     val effectivePrice = plan.discountPrice ?: plan.price
+                    val isCurrentActivePlan = isPremium && (plan.id == currentActivePlan?.id)
+                    val isLowerTier = isPremium && !isCurrentActivePlan && currentActivePlan != null && plan.durationDays < currentActivePlan.durationDays
+                    val isHigherTier = isPremium && !isCurrentActivePlan && currentActivePlan != null && plan.durationDays >= currentActivePlan.durationDays
 
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Slate800),
+                            .padding(vertical = 5.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isCurrentActivePlan) Slate800 else Slate850),
                         border = BorderStroke(
-                            1.dp,
-                            if (plan.isPopular) PremiumGold.copy(alpha = 0.8f) else Slate700
+                            width = if (isCurrentActivePlan) 1.5.dp else 1.dp,
+                            color = when {
+                                isCurrentActivePlan -> Emerald400.copy(alpha = 0.85f)
+                                plan.isPopular -> PremiumGold.copy(alpha = 0.8f)
+                                else -> Slate700
+                            }
                         )
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp)
+                                .padding(14.dp)
                         ) {
                             // Top Row: Badges
                             Row(
@@ -412,7 +558,32 @@ fun PremiumScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (plan.isPopular) {
+                                if (isCurrentActivePlan) {
+                                    Surface(
+                                        color = Emerald400.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(6.dp),
+                                        border = BorderStroke(1.dp, Emerald400.copy(alpha = 0.5f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = Emerald400,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "CURRENT ACTIVE PLAN",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Emerald400
+                                            )
+                                        }
+                                    }
+                                } else if (plan.isPopular) {
                                     Surface(
                                         color = PremiumGold.copy(alpha = 0.2f),
                                         shape = RoundedCornerShape(6.dp),
@@ -446,7 +617,7 @@ fun PremiumScreen(
                                     shape = RoundedCornerShape(6.dp)
                                 ) {
                                     val badgeLabel = when {
-                                        plan.billingPeriod == "pay_per_trip" -> "PAY-PER-TRIP"
+                                        plan.planType == "trip_credits" || plan.billingPeriod == "pay_per_trip" -> "${plan.creditsCount} TRIPS PACK"
                                         plan.durationDays == 1 -> "1 DAY PASS"
                                         else -> "${plan.durationDays} DAYS PASS"
                                     }
@@ -460,23 +631,23 @@ fun PremiumScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             // Plan Title
                             Text(
                                 text = plan.name,
-                                fontSize = 18.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Color.White
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             // Price
                             Row(verticalAlignment = Alignment.Bottom) {
                                 Text(
                                     text = "BDT ${effectivePrice.toInt()}",
-                                    fontSize = 24.sp,
+                                    fontSize = 22.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color.White
                                 )
@@ -485,34 +656,39 @@ fun PremiumScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "BDT ${plan.price.toInt()}",
-                                        fontSize = 14.sp,
+                                        fontSize = 13.sp,
                                         color = Slate500,
                                         textDecoration = TextDecoration.LineThrough,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
 
+                                val subText = if (plan.planType == "trip_credits" || plan.billingPeriod == "pay_per_trip") {
+                                    " / ${plan.creditsCount} trips (${plan.durationDays} days valid)"
+                                } else {
+                                    " / ${plan.durationDays} days"
+                                }
                                 Text(
-                                    text = " / ${plan.durationDays} days",
+                                    text = subText,
                                     fontSize = 11.sp,
                                     color = Slate400,
-                                    modifier = Modifier.padding(bottom = 3.dp, start = 4.dp)
+                                    modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             // Features
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 plan.features.forEach { feat ->
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
                                             imageVector = Icons.Default.CheckCircle,
                                             contentDescription = null,
                                             tint = Emerald400,
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(14.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = feat,
                                             fontSize = 12.sp,
@@ -522,46 +698,150 @@ fun PremiumScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
                             val hasPending = pendingTx != null
-                            // CTA Subscribe Button
-                            Button(
-                                onClick = {
-                                    if (hasPending) {
-                                        Toast.makeText(
-                                            context,
-                                            "You have a pending verification request. Please wait for admin approval.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
+
+                            // Contextual Action Button based on subscription state
+                            when {
+                                isCurrentActivePlan -> {
+                                    if (daysRemaining != null && daysRemaining <= 7) {
+                                        Button(
+                                            onClick = {
+                                                if (hasPending) {
+                                                    Toast.makeText(context, "Verification in progress for previous request.", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    checkoutPlan = plan
+                                                    senderNumber = profile?.phoneNumber ?: ""
+                                                    transactionId = ""
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Emerald500)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Autorenew, contentDescription = null, tint = Slate950, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Renew Plan (+${plan.durationDays} Days)",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = Slate950
+                                                )
+                                            }
+                                        }
                                     } else {
-                                        checkoutPlan = plan
-                                        senderNumber = profile?.phoneNumber ?: ""
-                                        transactionId = ""
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = Slate800,
+                                            border = BorderStroke(1.dp, Emerald400.copy(alpha = 0.5f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxSize(),
+                                                horizontalArrangement = Arrangement.Center,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Emerald400, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Active Plan (${daysRemaining ?: 0} Days Remaining)",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Emerald400
+                                                )
+                                            }
+                                        }
                                     }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (hasPending) Slate800 else if (plan.isPopular) PremiumGold else Cyan500
-                                )
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = if (hasPending) Icons.Default.HourglassTop else Icons.Default.Payment,
-                                        contentDescription = null,
-                                        tint = if (hasPending) Color(0xFFF59E0B) else Slate950,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (hasPending) "Verification In Progress" else "Subscribe via Mobile Banking",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = if (hasPending) Color(0xFFF59E0B) else Slate950
-                                    )
+                                }
+                                isLowerTier -> {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Slate900,
+                                        border = BorderStroke(1.dp, Slate800)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Lock, contentDescription = null, tint = Slate500, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Included in Active Plan",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Slate400
+                                            )
+                                        }
+                                    }
+                                }
+                                isHigherTier -> {
+                                    Button(
+                                        onClick = {
+                                            if (hasPending) {
+                                                Toast.makeText(context, "Verification in progress for previous request.", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                switchPlanConfirmation = plan
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Cyan500)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Upgrade, contentDescription = null, tint = Slate950, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Upgrade to ${plan.name}",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Slate950
+                                            )
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    Button(
+                                        onClick = {
+                                            if (hasPending) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "You have a pending verification request. Please wait for admin approval.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                checkoutPlan = plan
+                                                senderNumber = profile?.phoneNumber ?: ""
+                                                transactionId = ""
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(44.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (hasPending) Slate800 else if (plan.isPopular) PremiumGold else Cyan500
+                                        )
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = if (hasPending) Icons.Default.HourglassTop else Icons.Default.Payment,
+                                                contentDescription = null,
+                                                tint = if (hasPending) Color(0xFFF59E0B) else Slate950,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = if (hasPending) "Verification In Progress" else "Subscribe via Mobile Banking",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = if (hasPending) Color(0xFFF59E0B) else Slate950
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -570,9 +850,60 @@ fun PremiumScreen(
             }
         }
 
+        // Switch / Upgrade Plan Confirmation Dialog
+        if (switchPlanConfirmation != null) {
+            val targetPlan = switchPlanConfirmation!!
+            AlertDialog(
+                onDismissRequest = { switchPlanConfirmation = null },
+                containerColor = Color(0xFF0F172A),
+                shape = RoundedCornerShape(20.dp),
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Upgrade, contentDescription = null, tint = Cyan400, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Upgrade Subscription", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "You currently have an active membership valid until ${DateTimeUtils.formatAppDateTime(premiumUntil)}.",
+                            color = Slate300,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "Upgrading to ${targetPlan.name} will upgrade your benefits and extend your safety coverage by ${targetPlan.durationDays} days.",
+                            color = Slate400,
+                            fontSize = 12.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            checkoutPlan = targetPlan
+                            senderNumber = profile?.phoneNumber ?: ""
+                            transactionId = ""
+                            switchPlanConfirmation = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Cyan500),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Proceed to Checkout", color = Slate950, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { switchPlanConfirmation = null }) {
+                        Text("Keep Current Plan", color = Slate400)
+                    }
+                }
+            )
+        }
+
         // Checkout & Manual Payment Modal
         if (checkoutPlan != null && pendingTx == null) {
-            val effectivePrice = (checkoutPlan!!.discountPrice ?: checkoutPlan!!.price).toInt()
+            val promoCalculation = SubscriptionHelper.calculatePromoDiscount(appliedPromo, checkoutPlan!!)
+            val effectivePrice = promoCalculation.finalPrice.toInt()
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             var isNumberCopied by remember { mutableStateOf(false) }
 
@@ -702,7 +1033,8 @@ fun PremiumScreen(
                                             color = Color.White
                                         )
                                         val durationLabel = when {
-                                            checkoutPlan!!.billingPeriod == "pay_per_trip" -> "Pay-Per-Trip Access"
+                                            checkoutPlan!!.planType == "trip_credits" || checkoutPlan!!.billingPeriod == "pay_per_trip" -> 
+                                                "${checkoutPlan!!.creditsCount} Safe Trips (${checkoutPlan!!.durationDays} Days)"
                                             checkoutPlan!!.durationDays == 1 -> "1 Day Full Protection"
                                             else -> "${checkoutPlan!!.durationDays} Days Full Protection"
                                         }
@@ -711,13 +1043,30 @@ fun PremiumScreen(
                                             fontSize = 11.sp,
                                             color = Slate400
                                         )
+                                        if (promoCalculation.bonusDays > 0) {
+                                            Text(
+                                                text = "+${promoCalculation.bonusDays} Bonus Days Included",
+                                                fontSize = 10.sp,
+                                                color = Emerald400,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        if (promoCalculation.bonusCredits > 0) {
+                                            Text(
+                                                text = "+${promoCalculation.bonusCredits} Bonus Trips Included",
+                                                fontSize = 10.sp,
+                                                color = Emerald400,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
 
                                 Column(horizontalAlignment = Alignment.End) {
-                                    if (checkoutPlan!!.discountPrice != null && checkoutPlan!!.discountPrice!! < checkoutPlan!!.price) {
+                                    val basePrice = checkoutPlan!!.price.toInt()
+                                    if (basePrice > effectivePrice) {
                                         Text(
-                                            text = "BDT ${checkoutPlan!!.price.toInt()}",
+                                            text = "BDT $basePrice",
                                             fontSize = 11.sp,
                                             color = Slate400,
                                             textDecoration = TextDecoration.LineThrough
@@ -727,8 +1076,16 @@ fun PremiumScreen(
                                         text = "BDT $effectivePrice",
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = PremiumGold
+                                        color = if (appliedPromo != null) Emerald400 else PremiumGold
                                     )
+                                    if (appliedPromo != null && promoCalculation.discountAmount > 0) {
+                                        Text(
+                                            text = "Save BDT ${promoCalculation.discountAmount.toInt()}",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Emerald400
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1021,6 +1378,155 @@ fun PremiumScreen(
                             shape = RoundedCornerShape(12.dp)
                         )
 
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Promo Code Section
+                        Text(
+                            text = "HAVE A PROMO CODE?",
+                            fontSize = 10.sp,
+                            color = Slate400,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Slate900.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, if (appliedPromo != null) Emerald400.copy(alpha = 0.6f) else Slate700)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = enteredPromoCode,
+                                        onValueChange = { 
+                                            enteredPromoCode = it.uppercase()
+                                            if (appliedPromo != null && it != appliedPromo?.code) {
+                                                appliedPromo = null
+                                                promoFeedback = null
+                                            }
+                                        },
+                                        placeholder = { Text("Enter Promo Code", fontSize = 12.sp, color = Slate400) },
+                                        singleLine = true,
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.ConfirmationNumber,
+                                                contentDescription = null,
+                                                tint = if (appliedPromo != null) Emerald400 else Cyan400,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = Slate850,
+                                            unfocusedContainerColor = Slate850,
+                                            focusedBorderColor = if (appliedPromo != null) Emerald400 else Cyan400,
+                                            unfocusedBorderColor = Slate700,
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        enabled = !isVerifyingPromo
+                                    )
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    if (appliedPromo != null) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                appliedPromo = null
+                                                enteredPromoCode = ""
+                                                promoFeedback = null
+                                                promoFeedbackIsError = false
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            border = BorderStroke(1.dp, Slate600),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Slate300),
+                                            modifier = Modifier.height(48.dp)
+                                        ) {
+                                            Text("REMOVE", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = {
+                                                if (enteredPromoCode.isBlank()) {
+                                                    Toast.makeText(context, "Please enter promo code", Toast.LENGTH_SHORT).show()
+                                                    return@Button
+                                                }
+                                                isVerifyingPromo = true
+                                                promoFeedback = null
+                                                promoFeedbackIsError = false
+                                                scope.launch {
+                                                    val res = SupabaseManager.fetchPromoCode(enteredPromoCode.trim())
+                                                    isVerifyingPromo = false
+                                                    if (res.isSuccess) {
+                                                        val foundPromo = res.getOrNull()
+                                                        if (foundPromo == null) {
+                                                            appliedPromo = null
+                                                            promoFeedback = "Invalid or inactive promo code."
+                                                            promoFeedbackIsError = true
+                                                        } else {
+                                                            val calc = SubscriptionHelper.calculatePromoDiscount(foundPromo, checkoutPlan!!)
+                                                            if (calc.isValid) {
+                                                                appliedPromo = foundPromo
+                                                                val benefit = when {
+                                                                    calc.discountAmount > 0 -> "BDT ${calc.discountAmount.toInt()} discount applied!"
+                                                                    calc.bonusDays > 0 -> "+${calc.bonusDays} bonus days added!"
+                                                                    calc.bonusCredits > 0 -> "+${calc.bonusCredits} bonus trips added!"
+                                                                    else -> "Promo code applied successfully!"
+                                                                }
+                                                                promoFeedback = benefit
+                                                                promoFeedbackIsError = false
+                                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            } else {
+                                                                appliedPromo = null
+                                                                promoFeedback = calc.errorMessage ?: "Promo code cannot be applied to this plan."
+                                                                promoFeedbackIsError = true
+                                                            }
+                                                        }
+                                                    } else {
+                                                        appliedPromo = null
+                                                        promoFeedback = "Failed to verify promo code: ${res.exceptionOrNull()?.message}"
+                                                        promoFeedbackIsError = true
+                                                    }
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Cyan500),
+                                            enabled = !isVerifyingPromo && enteredPromoCode.isNotBlank(),
+                                            modifier = Modifier.height(48.dp)
+                                        ) {
+                                            if (isVerifyingPromo) {
+                                                CircularProgressIndicator(
+                                                    color = Color.White,
+                                                    modifier = Modifier.size(16.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            } else {
+                                                Text("APPLY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate950)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (!promoFeedback.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = promoFeedback!!,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (promoFeedbackIsError) Color(0xFFEF4444) else Emerald400,
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(18.dp))
 
                         // Submit Button
@@ -1047,7 +1553,13 @@ fun PremiumScreen(
                                         amount = effectivePrice.toDouble(),
                                         paymentMethod = selectedMethod,
                                         senderNumber = senderNumber.trim(),
-                                        transactionId = transactionId.trim()
+                                        transactionId = transactionId.trim(),
+                                        promoCode = appliedPromo?.code,
+                                        discountAmount = promoCalculation.discountAmount,
+                                        bonusDays = promoCalculation.bonusDays,
+                                        bonusCredits = promoCalculation.bonusCredits,
+                                        planType = checkoutPlan!!.planType,
+                                        creditsCount = checkoutPlan!!.creditsCount
                                     )
 
                                     isSubmittingPayment = false

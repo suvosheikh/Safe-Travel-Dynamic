@@ -1,8 +1,11 @@
 package com.safetravel.tracker.util
 
 import android.content.Context
+import android.util.Log
+import com.mapbox.bindgen.Value
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
+import com.mapbox.maps.Style
 import com.mapbox.maps.extension.compose.animation.viewport.MapViewportState
 
 /**
@@ -11,11 +14,25 @@ import com.mapbox.maps.extension.compose.animation.viewport.MapViewportState
  */
 object MapViewportCoordinator {
 
+    private const val TAG = "MapViewportCoordinator"
+
     // Default city fallback when no GPS or permission is available (Central Dhaka)
     val DEFAULT_FALLBACK_POINT: Point = Point.fromLngLat(90.4125, 23.8103)
     const val DEFAULT_CITY_ZOOM = 14.5
     const val DEFAULT_STREET_ZOOM = 15.5
     const val ROUTE_OVERVIEW_ZOOM = 14.0
+
+    /**
+     * Enforces 2D Mercator projection to prevent any 3D globe rendering under all circumstances.
+     */
+    fun enforceMercatorProjection(style: Style) {
+        try {
+            style.setStyleProjectionProperty("name", Value("mercator"))
+            Log.d(TAG, "Map projection explicitly set to Flat 2D Mercator (No Globe)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to enforce Mercator projection", e)
+        }
+    }
 
     /**
      * Resolves the camera position immediately upon map initialization.

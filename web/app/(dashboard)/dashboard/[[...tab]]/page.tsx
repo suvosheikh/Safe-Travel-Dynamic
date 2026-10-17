@@ -32,6 +32,7 @@ import SubscriptionPlansSection from '../../../../components/sections/Subscripti
 import TripDetailsModal from '../../../../components/TripDetailsModal';
 import AuthScreen from '../../../../components/auth/AuthScreen';
 import { useToast } from '../../../../components/ui/Toast';
+import { formatGmtPlus6DateTime } from '../../../../lib/dateTimeUtils';
 
 // Module-level pure helper functions to guarantee component rendering purity
 function createSafeId(prefix: string): string {
@@ -154,7 +155,7 @@ export default function AdminDashboardPage() {
   const formatDateTime = (isoString: string) => {
     if (!mounted) return '...';
     try {
-      return new Date(isoString).toLocaleString();
+      return formatGmtPlus6DateTime(isoString);
     } catch {
       return '...';
     }

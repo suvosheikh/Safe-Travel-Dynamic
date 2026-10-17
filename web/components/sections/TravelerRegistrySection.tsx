@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { DbState, TravelActivity, Profile, Guardian, getSupabaseClient } from '../../lib/supabase';
 import dynamic from 'next/dynamic';
 import ConfirmationWizard from '../ConfirmationWizard';
+import { formatGmtPlus6DateTime } from '../../lib/dateTimeUtils';
 
 const TripDetailsModal = dynamic(() => import('../TripDetailsModal'), { ssr: false });
 
@@ -767,7 +768,7 @@ export default function TravelerRegistrySection({
                             <span className="capitalize">{trip.transport_mode || 'Transit'}</span>
                           </span>
                           <span className="text-[9.5px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">
-                            {new Date((trip as any).start_time || (trip as any).created_at || new Date()).toLocaleDateString()}
+                            {formatGmtPlus6DateTime((trip as any).start_time || (trip as any).created_at)}
                           </span>
                         </div>
                         

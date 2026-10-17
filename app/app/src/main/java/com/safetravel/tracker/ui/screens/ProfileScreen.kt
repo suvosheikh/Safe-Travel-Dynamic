@@ -273,6 +273,8 @@ fun ProfileScreenContent(
     var wizardInitialStep by remember { mutableIntStateOf(1) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showTimezonePicker by remember { mutableStateOf(false) }
+    var currentTimezone by remember { mutableStateOf(com.safetravel.tracker.util.DateTimeUtils.userTimeZoneId) }
 
     // Dynamic Safety Score (0 - 100%)
     val safetyScore = remember(profile, guardians) {
@@ -374,6 +376,7 @@ fun ProfileScreenContent(
             // =============================================================
             item {
                 CompactPreferencesSection(
+                    onTimezoneClick = { showTimezonePicker = true },
                     onSyncDatabase = onSyncDatabase,
                     onAppInfoClick = onAppInfoClick,
                     onLogoutClick = { showLogoutDialog = true }
@@ -433,6 +436,16 @@ fun ProfileScreenContent(
                 }
             },
             shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (showTimezonePicker) {
+        com.safetravel.tracker.ui.components.TimezonePickerBottomSheet(
+            userId = profile?.id,
+            onDismiss = { showTimezonePicker = false },
+            onTimezoneChanged = { newTz ->
+                currentTimezone = newTz
+            }
         )
     }
 }
@@ -1046,6 +1059,7 @@ private fun CompactGuardiansSection(
 // =========================================================================
 @Composable
 private fun CompactPreferencesSection(
+    onTimezoneClick: () -> Unit,
     onSyncDatabase: () -> Unit,
     onAppInfoClick: () -> Unit,
     onLogoutClick: () -> Unit
@@ -1061,6 +1075,7 @@ private fun CompactPreferencesSection(
     ) {
         Text("PREFERENCES & VAULT", color = Slate400, fontSize = 9.sp, fontWeight = FontWeight.Black)
 
+        CompactActionRow("Timezone & Regional Time", Icons.Default.Schedule, CyberCyan, onTimezoneClick)
         CompactActionRow("Synchronize Cloud Vault", Icons.Default.CloudSync, CyberCyan, onSyncDatabase)
         CompactActionRow("Application Information", Icons.Default.Security, CyberEmerald, onAppInfoClick)
         CompactActionRow("Terminate Session", Icons.Default.Logout, EmergencyRed, onLogoutClick, isDestructive = true)

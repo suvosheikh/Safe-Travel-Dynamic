@@ -1,24 +1,33 @@
 package com.safetravel.tracker.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.safetravel.tracker.supabase.SupabaseTripShare
@@ -29,11 +38,11 @@ import com.safetravel.tracker.viewmodel.SafeTravelViewModel
 
 @Composable
 fun GuardianCenterScreen(vm: SafeTravelViewModel, onWatchTrip: (String) -> Unit) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val selectedTab by vm.guardianCenterSelectedTab.collectAsState()
     val shares by vm.incomingTripShares.collectAsState()
     val userProfile by vm.userProfile.collectAsState()
     val isPremium = userProfile?.isPremium == true
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val alertAdInterval = remember { com.safetravel.tracker.ads.AdMobManager.getAlertCardInterval(context) }
     val alertAdSize = remember { com.safetravel.tracker.ads.AdMobManager.getAlertCardSize(context) }
 
@@ -67,14 +76,16 @@ fun GuardianCenterScreen(vm: SafeTravelViewModel, onWatchTrip: (String) -> Unit)
         }
     }
 
-    // Auto-focus Live Watch if there are active shares and not manually chosen
-    var hasAutoSwitched by remember { mutableStateOf(false) }
+    // Auto-focus SOS or Live Watch only on initial entry if not yet switched
     LaunchedEffect(liveShares.size, sosShares.size) {
-        if (sosShares.isNotEmpty()) {
-            selectedTab = 0 // Critical SOS distress takes top priority
-        } else if (liveShares.isNotEmpty() && !hasAutoSwitched) {
-            selectedTab = 1
-            hasAutoSwitched = true
+        if (!vm.hasAutoSwitchedGuardianTab) {
+            if (sosShares.isNotEmpty()) {
+                vm.guardianCenterSelectedTab.value = 0 // Critical SOS distress takes top priority
+                vm.hasAutoSwitchedGuardianTab = true
+            } else if (liveShares.isNotEmpty()) {
+                vm.guardianCenterSelectedTab.value = 1
+                vm.hasAutoSwitchedGuardianTab = true
+            }
         }
     }
 
@@ -83,29 +94,51 @@ fun GuardianCenterScreen(vm: SafeTravelViewModel, onWatchTrip: (String) -> Unit)
             .fillMaxSize()
             .background(Slate900)
     ) {
-        // Custom Tab Header
+        // --- FROSTED CYBER TAB HEADER ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .background(Slate800, RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xCC0F172A), Color(0xD9090D16))))
+                .border(1.dp, Color(0x3306B6D4), RoundedCornerShape(14.dp))
                 .padding(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val tabs = listOf(
-                Pair("SOS", sosShares.size), 
-                Pair("Live Watch", liveShares.size), 
-                Pair("History", historyShares.size)
+                Triple("SOS", sosShares.size, Color(0xFFEF4444)), 
+                Triple("Live Watch", liveShares.size, Color(0xFF06B6D4)), 
+                Triple("History", historyShares.size, Color(0xFF10B981))
             )
-            tabs.forEachIndexed { index, (title, count) ->
+            tabs.forEachIndexed { index, (title, count, activeColor) ->
                 val isSelected = selectedTab == index
+                val tabModifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .then(
+                        if (isSelected) {
+                            Modifier.background(
+                                Brush.verticalGradient(
+                                    listOf(activeColor.copy(alpha = 0.25f), activeColor.copy(alpha = 0.12f))
+                                )
+                            )
+                        } else {
+                            Modifier.background(Color.Transparent)
+                        }
+                    )
+                    .border(
+                        width = if (isSelected) 1.dp else 0.dp,
+                        color = if (isSelected) activeColor.copy(alpha = 0.6f) else Color.Transparent,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .clickable {
+                        vm.guardianCenterSelectedTab.value = index
+                        vm.hasAutoSwitchedGuardianTab = true
+                    }
+                    .padding(vertical = 9.dp)
+
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Emerald400 else Color.Transparent)
-                        .clickable { selectedTab = index }
-                        .padding(vertical = 10.dp),
+                    modifier = tabModifier,
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -114,24 +147,22 @@ fun GuardianCenterScreen(vm: SafeTravelViewModel, onWatchTrip: (String) -> Unit)
                     ) {
                         Text(
                             text = title,
-                            color = if (isSelected) Color(0xFF022C22) else Slate300,
+                            color = if (isSelected) activeColor else Slate400,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
                             maxLines = 1
                         )
                         if (count > 0) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            val badgeBg = if (index == 0) Color(0xFFEF4444) else if (isSelected) Color(0xFF022C22) else Emerald400
-                            val badgeText = if (index == 0) Color.White else if (isSelected) Emerald400 else Color(0xFF022C22)
+                            Spacer(modifier = Modifier.width(5.dp))
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(badgeBg)
+                                    .background(activeColor)
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
                                 Text(
                                     text = "$count",
-                                    color = badgeText,
+                                    color = Slate950,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black
                                 )
@@ -156,141 +187,260 @@ fun SosSection(
     sosAlerts: List<SupabaseTripShare> = emptyList(),
     onWatchTrip: (String) -> Unit
 ) {
+    val context = LocalContext.current
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(bottom = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Text(
-                text = "Emergency & Alerts Center",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = Slate100,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            Text(
-                text = "Broadcast SOS coordinates to your guardian network in case of emergency.",
-                fontSize = 12.sp,
-                color = Slate300
-            )
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Slate800),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Slate700)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFFEE2E2)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "SOS",
-                            tint = Color(0xFFEF4444),
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Trigger Direct SOS",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate100
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Pressing below immediately shares your live location with your emergency guardians.",
-                        fontSize = 12.sp,
-                        color = Slate300,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = { vm.triggerSos() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                    ) {
-                        Text("Broadcast Emergency SOS", fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
-            }
-        }
-
+        // --- INCOMING SOS DISTRESS ALERTS ---
         if (sosAlerts.isNotEmpty()) {
             item {
-                Text(
-                    text = "Emergency SOS Alerts",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFEF4444),
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-            items(sosAlerts) { share ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().clickable { onWatchTrip(share.tripId) },
-                    colors = CardDefaults.cardColors(containerColor = Slate800),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.6f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(modifier = Modifier.size(6.dp).background(Color(0xFFEF4444), CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "ACTIVE EMERGENCY ALERTS (${sosAlerts.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFFEF4444),
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            items(sosAlerts) { share ->
+                val trip = share.tripDetails
+                val tripId = trip?.id ?: share.tripId
+                val sharedUser = share.sharedByProfile
+                val phone = sharedUser?.phoneNumber
+                val locationAddress = AddressUtils.formatDisplayAddress(trip?.startAddress ?: trip?.startLocation ?: "Live GPS Coordinates")
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Slate800),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFFEF4444).copy(alpha = 0.85f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFFEF4444).copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
+                        // Header: Avatar, Name & SOS Active Tag
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Warning, null, tint = Color(0xFFEF4444), modifier = Modifier.size(22.dp))
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0x33EF4444)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = sharedUser?.fullName ?: "Someone in your network",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    if (!phone.isNullOrBlank()) {
+                                        Text(
+                                            text = phone,
+                                            color = Slate400,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            Surface(
+                                color = Color(0xFFEF4444),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(modifier = Modifier.size(4.dp).background(Color.White, CircleShape))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "SOS ACTIVE",
+                                        color = Color.White,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                            }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "EMERGENCY: ${share.sharedByProfile?.fullName ?: "Someone"}",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Emergency alert triggered! Tap to track their live location immediately.",
-                                color = Color(0xFFFCA5A5),
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color(0xFFEF4444).copy(0.85f), modifier = Modifier.size(12.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Location Details
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = Slate900.copy(alpha = 0.6f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Place,
+                                    contentDescription = null,
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = formatShareTimestamp(share.createdAt ?: share.tripDetails?.createdAt),
-                                    color = Slate400,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
+                                    text = locationAddress,
+                                    color = Slate200,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Timestamp row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccessTime,
+                                contentDescription = null,
+                                tint = Slate400,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = DateTimeUtils.formatAppDateTime(share.createdAt ?: trip?.createdAt),
+                                color = Slate400,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Action Buttons Row: Track Live Map & Direct Call
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onWatchTrip(tripId) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Explore, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Track Live Map", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                }
+                            }
+
+                            if (!phone.isNullOrBlank()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        try {
+                                            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                            context.startActivity(dialIntent)
+                                        } catch (_: Exception) {}
+                                    },
+                                    border = BorderStroke(1.dp, Slate600),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(38.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Phone, contentDescription = null, tint = Emerald400, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Call Now", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Reassuring Empty State
+            item {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Slate800.copy(alpha = 0.7f),
+                    border = BorderStroke(1.dp, Slate700)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFFEF4444))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Emerald400.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text("SOS ACTIVE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = Emerald400,
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = "Your Network is Safe",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "No emergency distress signals are active in your network. When a family member or friend triggers an SOS, their live location and alert will sound here.",
+                            color = Slate400,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 17.sp
+                        )
                     }
                 }
             }
@@ -307,18 +457,37 @@ fun LiveWatchSection(
     onWatchTrip: (String) -> Unit
 ) {
     if (activeShares.isEmpty()) {
-        EmptyState("No Active Shared Trips", Icons.Outlined.Visibility, "When someone shares their live journey with you, it will appear here.")
+        EmptyState(
+            title = "No Live Journeys Active",
+            icon = Icons.Outlined.Visibility,
+            description = "When a family member or contact starts a journey with live sharing, their real-time route, speed, and GPS will appear here."
+        )
     } else {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 100.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                Text("Ongoing Journeys", color = Emerald400, fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(vertical = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(6.dp).background(CyberCyan, CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "ONGOING JOURNEYS (${activeShares.size})",
+                        color = CyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
+                    )
+                }
             }
             itemsIndexed(activeShares) { index, share ->
-                SharedTripCard(share, onWatchTrip)
+                LiveWatchTripCard(share = share, onWatchTrip = onWatchTrip)
                 if ((index + 1) % adInterval == 0) {
                     com.safetravel.tracker.ads.AdCardView(
                         modifier = Modifier.padding(vertical = 4.dp),
@@ -326,6 +495,169 @@ fun LiveWatchSection(
                         formatKey = "alert_card",
                         sizeType = adSize
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LiveWatchTripCard(share: SupabaseTripShare, onWatchTrip: (String) -> Unit) {
+    val trip = share.tripDetails
+    val tripId = trip?.id ?: share.tripId
+    val destination = AddressUtils.formatDisplayAddress(trip?.endAddress ?: trip?.endLocation)
+    val origin = AddressUtils.formatDisplayAddress(trip?.startAddress ?: trip?.startLocation ?: "Current Origin")
+    val travelerName = share.sharedByProfile?.fullName ?: "Someone"
+    val mode = trip?.transportMode ?: "car"
+
+    val modeIcon = when (mode.lowercase()) {
+        "walking" -> Icons.AutoMirrored.Filled.DirectionsWalk
+        "cycling", "bike" -> Icons.AutoMirrored.Filled.DirectionsBike
+        else -> Icons.Default.DirectionsCar
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onWatchTrip(tripId) },
+        colors = CardDefaults.cardColors(containerColor = Slate800),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.2.dp, CyberCyan.copy(alpha = 0.45f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            // Top Row: Traveler Name & Live Now Tag
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(CyberCyan.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(modeIcon, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = travelerName,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Traveling via ${mode.replaceFirstChar { it.uppercase() }}",
+                            color = Slate400,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Surface(
+                    color = CyberCyan.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, CyberCyan.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(4.dp).background(CyberCyan, CircleShape))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "LIVE NOW",
+                            color = CyberCyan,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Origin -> Destination Route Flow
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = Slate900.copy(alpha = 0.6f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(6.dp).background(Emerald400, CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = origin,
+                            color = Slate300,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(6.dp).background(Color(0xFFF43F5E), CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = destination,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Bottom action row: Timestamp and Watch Live button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AccessTime, contentDescription = null, tint = Slate400, modifier = Modifier.size(12.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = DateTimeUtils.formatAppDateTime(share.createdAt ?: trip?.createdAt),
+                        color = Slate400,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(CyberCyan.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Watch Map",
+                        color = CyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -340,19 +672,41 @@ fun HistorySection(
     adSize: String = "large_banner",
     onWatchTrip: (String) -> Unit
 ) {
-    if (pastShares.isEmpty()) {
-        EmptyState("No Shared History", Icons.Outlined.History, "Records of completed journeys shared with you will be archived here.")
+    val sortedPastShares = remember(pastShares) {
+        pastShares.sortedWith(
+            compareByDescending<SupabaseTripShare> { it.createdAt ?: it.tripDetails?.createdAt ?: "" }
+                .thenByDescending { it.id }
+        )
+    }
+
+    if (sortedPastShares.isEmpty()) {
+        EmptyState(
+            title = "No Shared History Yet",
+            icon = Icons.Outlined.History,
+            description = "Records of completed journeys and resolved alerts shared with you will be archived here."
+        )
     } else {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 100.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                Text("Past Shared Journeys", color = Slate400, fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    text = "PAST SHARED JOURNEYS (${sortedPastShares.size})",
+                    color = Slate400,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.5.sp
+                )
             }
-            itemsIndexed(pastShares) { index, share ->
-                SharedTripCard(share, onWatchTrip = onWatchTrip)
+            itemsIndexed(
+                items = sortedPastShares,
+                key = { _, share -> share.id }
+            ) { index, share ->
+                PastTripShareCard(share = share, onWatchTrip = onWatchTrip)
                 if ((index + 1) % adInterval == 0) {
                     com.safetravel.tracker.ads.AdCardView(
                         modifier = Modifier.padding(vertical = 4.dp),
@@ -366,69 +720,168 @@ fun HistorySection(
     }
 }
 
-fun formatShareTimestamp(isoTimestamp: String?): String {
-    if (isoTimestamp.isNullOrBlank()) return "Active now"
-    return DateTimeUtils.formatBstShort(isoTimestamp).ifBlank { "Active now" }
-}
-
 @Composable
-fun SharedTripCard(share: SupabaseTripShare, onWatchTrip: (String) -> Unit) {
+fun PastTripShareCard(share: SupabaseTripShare, onWatchTrip: (String) -> Unit) {
     val trip = share.tripDetails
     val tripId = trip?.id ?: share.tripId
     val destination = AddressUtils.formatDisplayAddress(trip?.endAddress ?: trip?.endLocation)
-    val isSos = share.status == "sos" || trip?.status == "sos"
-    val isActive = (share.status == "active" || trip?.status == "ongoing") && !isSos
+    val origin = AddressUtils.formatDisplayAddress(trip?.startAddress ?: trip?.startLocation ?: "Origin")
+    val travelerName = share.sharedByProfile?.fullName ?: "Someone"
+    val isSosResolved = share.status == "sos" || trip?.status == "sos"
+    val mode = trip?.transportMode ?: "car"
+
+    val modeIcon = when (mode.lowercase()) {
+        "walking" -> Icons.AutoMirrored.Filled.DirectionsWalk
+        "cycling", "bike" -> Icons.AutoMirrored.Filled.DirectionsBike
+        else -> Icons.Default.DirectionsCar
+    }
+
+    val statusColor = if (isSosResolved) Color(0xFFF59E0B) else Emerald400
+    val statusText = if (isSosResolved) "SOS RESOLVED" else "COMPLETED SAFELY"
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onWatchTrip(tripId) },
         colors = CardDefaults.cardColors(containerColor = Slate800),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, if (isSos) Color(0xFFEF4444).copy(0.6f) else if (isActive) Emerald400.copy(0.3f) else Slate700)
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.2.dp, statusColor.copy(alpha = 0.35f))
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(if (isSos) Color(0x33EF4444) else Slate900),
-                contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            // Top Row: Mode Avatar, Traveler Name & Resolution Badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isSos) Icons.Default.Warning else Icons.Default.Person,
-                    contentDescription = null,
-                    tint = if (isSos) Color(0xFFEF4444) else Emerald400
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(statusColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(modeIcon, contentDescription = null, tint = statusColor, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = travelerName,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Traveled via ${mode.replaceFirstChar { it.uppercase() }}",
+                            color = Slate400,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Surface(
+                    color = statusColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.45f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(4.dp).background(statusColor, CircleShape))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = statusText,
+                            color = statusColor,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(share.sharedByProfile?.fullName ?: "Someone", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text("Traveling to $destination", color = Slate400, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(4.dp))
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Origin -> Destination Route Flow Box
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = Slate900.copy(alpha = 0.6f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(6.dp).background(Emerald400, CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = origin,
+                            color = Slate300,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(6.dp).background(Color(0xFFF43F5E), CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = destination,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Bottom action row: Timestamp and View Route button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.AccessTime, contentDescription = null, tint = Slate400, modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = formatShareTimestamp(share.createdAt ?: trip?.createdAt),
+                        text = DateTimeUtils.formatAppDateTime(share.createdAt ?: trip?.createdAt),
                         color = Slate400,
                         fontSize = 11.sp
                     )
                 }
-                if (isSos) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                        Box(modifier = Modifier.size(6.dp).background(Color(0xFFEF4444), CircleShape))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("SOS EMERGENCY", color = Color(0xFFEF4444), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    }
-                } else if (isActive) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                        Box(modifier = Modifier.size(6.dp).background(Emerald400, CircleShape))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("LIVE NOW", color = Emerald400, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(statusColor.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "View Route",
+                        color = statusColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = statusColor, modifier = Modifier.size(14.dp))
                 }
-            }
-            if (isSos || isActive) {
-                Icon(Icons.Default.ChevronRight, null, tint = if (isSos) Color(0xFFEF4444) else Slate600)
             }
         }
     }
@@ -436,15 +889,40 @@ fun SharedTripCard(share: SupabaseTripShare, onWatchTrip: (String) -> Unit) {
 
 @Composable
 fun EmptyState(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, description: String) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Slate800.copy(alpha = 0.6f),
+        border = BorderStroke(1.dp, Slate700)
     ) {
-        Icon(icon, null, modifier = Modifier.size(64.dp), tint = Slate700)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(description, color = Slate400, fontSize = 13.sp, textAlign = TextAlign.Center)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.05f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, modifier = Modifier.size(28.dp), tint = Slate500)
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = description,
+                color = Slate400,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 17.sp
+            )
+        }
     }
 }

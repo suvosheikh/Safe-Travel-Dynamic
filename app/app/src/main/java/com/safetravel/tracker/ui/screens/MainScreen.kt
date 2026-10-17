@@ -19,6 +19,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.HelpCenter
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -231,7 +235,9 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
 
     // Unified Back Handling Logic
     BackHandler(enabled = !showExitSheet) {
-        if (selectedTip != null) {
+        if (watchTripId != null) {
+            watchTripId = null
+        } else if (selectedTip != null) {
             selectedTip = null
         } else if (showSafetyTips) {
             showSafetyTips = false
@@ -272,7 +278,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = selectedTab != 1,
+        gesturesEnabled = false,
         scrimColor = Color(0x6604020C),
         drawerContent = {
             ModalDrawerSheet(
@@ -469,7 +475,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                             )
 
                             SidebarMenuItem(
-                                icon = Icons.Default.Article,
+                                icon = Icons.AutoMirrored.Filled.Article,
                                 iconTint = Color(0xFF06B6D4),
                                 label = "Safety News & Alerts",
                                 badgeCount = newsList.size,
@@ -519,7 +525,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                             )
 
                             SidebarMenuItem(
-                                icon = Icons.Default.HelpCenter,
+                                icon = Icons.AutoMirrored.Filled.HelpCenter,
                                 iconTint = Color(0xFF8B5CF6),
                                 label = "Help & Support",
                                 isSelected = selectedTab == 6 && !showEmergencyContacts && !showSafetyTips,
@@ -562,7 +568,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Logout,
+                                    imageVector = Icons.AutoMirrored.Filled.Logout,
                                     contentDescription = "Sign Out",
                                     tint = Color(0xFFEF4444),
                                     modifier = Modifier.size(16.dp)
@@ -633,7 +639,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                                 else resetSubScreens()
                             }) {
                                 Icon(
-                                    imageVector = Icons.Default.ArrowBack,
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
                                     tint = GlassColors.TextPrimary,
                                     modifier = Modifier.size(24.dp)
@@ -795,7 +801,9 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                     } else if (showEmergencyContacts) {
                         EmergencyContactScreen(vm = vm, onBack = { showEmergencyContacts = false })
                     } else if (watchTripId != null) {
-                        GuardianLiveMapScreen(vm = vm, tripId = watchTripId!!, onBack = { watchTripId = null })
+                        key(watchTripId) {
+                            GuardianLiveMapScreen(vm = vm, tripId = watchTripId!!, onBack = { watchTripId = null })
+                        }
                     } else if (selectedNews != null) {
                         NewsDetailScreen(
                             news = selectedNews!!,
@@ -886,13 +894,31 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .shadow(
-                                elevation = 16.dp,
+                                elevation = 18.dp,
                                 shape = RoundedCornerShape(26.dp),
-                                ambientColor = Color.Black.copy(alpha = 0.55f),
-                                spotColor = Color.Black.copy(alpha = 0.65f)
+                                ambientColor = Color(0x3306B6D4),
+                                spotColor = Color.Black.copy(alpha = 0.70f)
                             )
                             .clip(RoundedCornerShape(26.dp))
-                            .background(Color(0xE60D111D))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xCC0F172A),
+                                        Color(0xD9090D16)
+                                    )
+                                )
+                            )
+                            .border(
+                                width = 1.2.dp,
+                                brush = Brush.verticalGradient(
+                                    listOf(
+                                        Color(0x5938BDF8),
+                                        Color(0x1F06B6D4),
+                                        Color(0x0DFFFFFF)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(26.dp)
+                            )
                             .padding(horizontal = 6.dp, vertical = 6.dp)
                     ) {
                         Row(
@@ -1072,6 +1098,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                         }
                     }
                 }
+
             }
         }
     }

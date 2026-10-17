@@ -25,5 +25,7 @@ val Cyan400 = Color(0xFF22D3EE) // Bright Cyan Highlight
 val Emerald500 = Color(0xFF10B981) // Cyber Emerald
 val Yellow500 = Color(0xFFEAB308) // Warning/Caution Yellow
 val Rose500 = Color(0xFFF43F5E) // Cyber Rose / Accent Red
+val CyberCyan = Color(0xFF06B6D4) // Neon Cyber Cyan
+val CyberEmerald = Color(0xFF10B981) // Cyber Emerald
 
 

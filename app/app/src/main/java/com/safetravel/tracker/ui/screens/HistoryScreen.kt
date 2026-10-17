@@ -57,7 +57,10 @@ fun HistoryScreen(vm: SafeTravelViewModel) {
     val historyAdSize = remember { com.safetravel.tracker.ads.AdMobManager.getHistoryCardSize(context) }
 
     val sortedTrips = remember(pastTrips) {
-        pastTrips.sortedByDescending { it.createdAt }
+        pastTrips.sortedWith(
+            compareByDescending<SupabaseTrip> { it.createdAt ?: "" }
+                .thenByDescending { it.id }
+        )
     }
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Trips, 1: Voice Vault
@@ -190,9 +193,12 @@ fun HistoryScreen(vm: SafeTravelViewModel) {
                         }
                     }
                 } else {
-                    itemsIndexed(sortedTrips) { index, rawTrip ->
-                        var tripState by remember { mutableStateOf(rawTrip) }
-                        LaunchedEffect(rawTrip) {
+                    itemsIndexed(
+                        items = sortedTrips,
+                        key = { _, rawTrip -> rawTrip.id }
+                    ) { index, rawTrip ->
+                        var tripState by remember(rawTrip.id) { mutableStateOf(rawTrip) }
+                        LaunchedEffect(rawTrip.id) {
                             tripState = vm.resolveTripAddresses(rawTrip)
                         }
                         
@@ -266,13 +272,15 @@ fun HistoryScreen(vm: SafeTravelViewModel) {
     }
 
     // Detail Bottom Sheet
-    if (selectedTrip != null) {
-        TripDetailSheet(
-            trip = selectedTrip!!,
-            vm = vm,
-            sheetState = sheetState,
-            onDismiss = { selectedTrip = null }
-        )
+    selectedTrip?.let { trip ->
+        key(trip.id) {
+            TripDetailSheet(
+                trip = trip,
+                vm = vm,
+                sheetState = sheetState,
+                onDismiss = { selectedTrip = null }
+            )
+        }
     }
 }
 
@@ -374,7 +382,7 @@ fun EnhancedTripCard(trip: SupabaseTrip, onClick: () -> Unit) {
                 }
                 
                 Text(
-                    text = DateTimeUtils.formatBstDateTime(trip.createdAt, "dd MMM yyyy, hh:mm a"),
+                    text = DateTimeUtils.formatAppDateTime(trip.createdAt),
                     color = Slate500,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
@@ -491,7 +499,7 @@ fun TripDetailSheet(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
-            val bstCreatedAt = DateTimeUtils.formatBstDateTime(trip.createdAt, "dd MMM yyyy, hh:mm a")
+            val bstCreatedAt = DateTimeUtils.formatAppDateTime(trip.createdAt)
             Text(
                 text = "Trip ID: #${trip.id.take(8).uppercase()}" + if (bstCreatedAt.isNotBlank()) " • $bstCreatedAt" else "",
                 color = Slate500,
@@ -557,15 +565,17 @@ fun TripDetailSheet(
                     } else null
                 }
 
-                HistoryMapView(
-                    startPoint = startP,
-                    endPoint = endP,
-                    recordedPath = recordedPoints,
-                    mapboxToken = mapboxToken,
-                    transportMode = trip.transportMode,
-                    plannedRoute = plannedPoints,
-                    modifier = Modifier.fillMaxSize()
-                )
+                key(trip.id) {
+                    HistoryMapView(
+                        startPoint = startP,
+                        endPoint = endP,
+                        recordedPath = recordedPoints,
+                        mapboxToken = mapboxToken,
+                        transportMode = trip.transportMode,
+                        plannedRoute = plannedPoints,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

@@ -553,3 +553,112 @@ create table if not exists public.emergency_hotlines (
 ALTER TABLE public.emergency_hotlines ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Anyone can view emergency hotlines" ON public.emergency_hotlines;
 CREATE POLICY "Anyone can view emergency hotlines" ON public.emergency_hotlines FOR SELECT USING (true);
+
+-- ==========================================
+-- SUBSCRIPTIONS, PROMO CODES & TRIP CREDITS MODULE
+-- ==========================================
+
+-- 1. Profiles Table columns for subscriptions & credits
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS premium_until TIMESTAMPTZ DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS trip_credits INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS credits_valid_until TIMESTAMPTZ DEFAULT NULL;
+
+-- 2. Subscription Plans Table
+CREATE TABLE IF NOT EXISTS public.subscription_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  plan_type TEXT NOT NULL DEFAULT 'time_pass', -- 'time_pass' (day based) or 'trip_credits' (trip pack)
+  billing_period TEXT NOT NULL DEFAULT 'monthly', -- 'custom', 'monthly', 'quarterly', 'yearly', 'pay_per_trip'
+  duration_days INT NOT NULL DEFAULT 30, -- Days of validity (e.g. 10, 30, 60, 120, 365)
+  credits_count INT NOT NULL DEFAULT 0, -- For trip_credits plans: number of trips included
+  price NUMERIC NOT NULL DEFAULT 0,
+  discount_price NUMERIC DEFAULT NULL,
+  currency TEXT NOT NULL DEFAULT 'BDT',
+  features TEXT[] DEFAULT ARRAY[]::TEXT[],
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  is_popular BOOLEAN NOT NULL DEFAULT FALSE,
+  display_order INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.subscription_plans 
+ADD COLUMN IF NOT EXISTS plan_type TEXT DEFAULT 'time_pass',
+ADD COLUMN IF NOT EXISTS credits_count INT DEFAULT 0;
+
+ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view active plans" ON public.subscription_plans;
+CREATE POLICY "Anyone can view active plans" ON public.subscription_plans FOR SELECT USING (is_active = true);
+DROP POLICY IF EXISTS "Admins can manage plans" ON public.subscription_plans;
+CREATE POLICY "Admins can manage plans" ON public.subscription_plans FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+);
+
+-- 3. Promo Codes Table
+CREATE TABLE IF NOT EXISTS public.promo_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT NOT NULL UNIQUE,
+  discount_type TEXT NOT NULL, -- 'percent', 'fixed', 'bonus_days', 'bonus_credits'
+  discount_value NUMERIC NOT NULL DEFAULT 0, -- % off or BDT flat off
+  bonus_days INT NOT NULL DEFAULT 0, -- Extra bonus days added to plan duration
+  bonus_credits INT NOT NULL DEFAULT 0, -- Extra bonus trips added
+  min_order_amount NUMERIC NOT NULL DEFAULT 0,
+  max_discount_amount NUMERIC DEFAULT NULL,
+  applicable_plan_types TEXT[] DEFAULT ARRAY['time_pass', 'trip_credits'],
+  max_uses INT DEFAULT NULL,
+  used_count INT NOT NULL DEFAULT 0,
+  valid_until TIMESTAMPTZ DEFAULT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.promo_codes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can read active promo codes" ON public.promo_codes;
+CREATE POLICY "Anyone can read active promo codes" ON public.promo_codes FOR SELECT USING (is_active = true);
+DROP POLICY IF EXISTS "Admins can manage promo codes" ON public.promo_codes;
+CREATE POLICY "Admins can manage promo codes" ON public.promo_codes FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+);
+
+-- 4. Payment Transactions Table
+CREATE TABLE IF NOT EXISTS public.payment_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  plan_id UUID REFERENCES public.subscription_plans(id) ON DELETE SET NULL,
+  plan_type TEXT DEFAULT 'time_pass',
+  credits_count INT DEFAULT 0,
+  amount NUMERIC NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'BDT',
+  payment_method TEXT NOT NULL DEFAULT 'bkash', -- 'bkash', 'nagad', 'rocket'
+  sender_number TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  promo_code TEXT DEFAULT NULL,
+  discount_amount NUMERIC DEFAULT 0,
+  bonus_days INT DEFAULT 0,
+  bonus_credits INT DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+  admin_notes TEXT DEFAULT NULL,
+  reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  reviewed_at TIMESTAMPTZ DEFAULT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.payment_transactions 
+ADD COLUMN IF NOT EXISTS promo_code TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS bonus_days INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS bonus_credits INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS plan_type TEXT DEFAULT 'time_pass',
+ADD COLUMN IF NOT EXISTS credits_count INT DEFAULT 0;
+
+ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can read their own transactions" ON public.payment_transactions;
+CREATE POLICY "Users can read their own transactions" ON public.payment_transactions FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert payment transactions" ON public.payment_transactions;
+CREATE POLICY "Users can insert payment transactions" ON public.payment_transactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Admins can manage payment transactions" ON public.payment_transactions;
+CREATE POLICY "Admins can manage payment transactions" ON public.payment_transactions FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+);
+

@@ -40,6 +40,7 @@ object SupabaseManager {
 
     fun initSession(context: android.content.Context) {
         appContext = context.applicationContext
+        com.safetravel.tracker.util.DateTimeUtils.init(context)
         val sharedPrefs = context.getSharedPreferences("safetravel_session", android.content.Context.MODE_PRIVATE)
         SupabaseClient.sharedPrefs = sharedPrefs
         currentSessionToken = sharedPrefs.getString("session_token", null)
@@ -1297,7 +1298,13 @@ object SupabaseManager {
         amount: Double,
         paymentMethod: String,
         senderNumber: String,
-        transactionId: String
+        transactionId: String,
+        promoCode: String? = null,
+        discountAmount: Double? = null,
+        bonusDays: Int? = null,
+        bonusCredits: Int? = null,
+        planType: String? = null,
+        creditsCount: Int? = null
     ): Result<SupabasePaymentTransaction> {
         if (isConfigured) {
             try {
@@ -1313,6 +1320,25 @@ object SupabaseManager {
                 if (planId != null) {
                     payload["plan_id"] = planId
                 }
+                if (!promoCode.isNullOrBlank()) {
+                    payload["promo_code"] = promoCode
+                }
+                if (discountAmount != null && discountAmount > 0) {
+                    payload["discount_amount"] = discountAmount
+                }
+                if (bonusDays != null && bonusDays > 0) {
+                    payload["bonus_days"] = bonusDays
+                }
+                if (bonusCredits != null && bonusCredits > 0) {
+                    payload["bonus_credits"] = bonusCredits
+                }
+                if (!planType.isNullOrBlank()) {
+                    payload["plan_type"] = planType
+                }
+                if (creditsCount != null && creditsCount > 0) {
+                    payload["credits_count"] = creditsCount
+                }
+
                 val response = dbService?.submitPaymentTransaction(payload, currentAuthHeader)
                 if (response?.isSuccessful == true && !response.body().isNullOrEmpty()) {
                     return Result.success(response.body()!!.first())
@@ -1325,6 +1351,27 @@ object SupabaseManager {
             }
         }
         return Result.failure(Exception("Payment service is currently unavailable."))
+    }
+
+    suspend fun fetchPromoCode(code: String): Result<com.safetravel.tracker.supabase.SupabasePromoCode?> {
+        if (isConfigured) {
+            try {
+                val response = dbService?.getPromoCode(
+                    userAuth = currentAuthHeader,
+                    codeQuery = "eq.${code.trim().uppercase()}"
+                )
+                if (response?.isSuccessful == true) {
+                    val list = response.body()
+                    return Result.success(list?.firstOrNull())
+                } else {
+                    val err = response?.errorBody()?.string() ?: response?.message() ?: "Promo check failed"
+                    return Result.failure(Exception(err))
+                }
+            } catch (e: Exception) {
+                return Result.failure(e)
+            }
+        }
+        return Result.failure(Exception("Service unavailable"))
     }
 
     suspend fun fetchVersionLogs(): Result<List<SupabaseVersionLog>> {
@@ -1342,6 +1389,47 @@ object SupabaseManager {
             }
         }
         return Result.success(emptyList())
+    }
+
+    suspend fun fetchUserPreference(userId: String): Result<SupabaseUserPreference?> {
+        if (isConfigured) {
+            try {
+                val response = dbService?.getUserPreferences(currentAuthHeader, "eq.$userId")
+                if (response?.isSuccessful == true) {
+                    val pref = response.body()?.firstOrNull()
+                    return Result.success(pref)
+                } else {
+                    val err = response?.errorBody()?.string() ?: response?.message() ?: "Failed to fetch preferences"
+                    return Result.failure(Exception(err))
+                }
+            } catch (e: Exception) {
+                return Result.failure(e)
+            }
+        }
+        return Result.success(null)
+    }
+
+    suspend fun saveUserPreference(userId: String, timezone: String): Result<Boolean> {
+        if (isConfigured) {
+            try {
+                val payload = mapOf(
+                    "user_id" to userId,
+                    "timezone" to timezone,
+                    "date_format" to "dd MMM yyyy hh:mm a",
+                    "updated_at" to getIsoInstantString()
+                )
+                val response = dbService?.upsertUserPreferences(payload, currentAuthHeader)
+                if (response?.isSuccessful == true) {
+                    return Result.success(true)
+                } else {
+                    val err = response?.errorBody()?.string() ?: response?.message() ?: "Failed to save preferences"
+                    return Result.failure(Exception(err))
+                }
+            } catch (e: Exception) {
+                return Result.failure(e)
+            }
+        }
+        return Result.success(true)
     }
 }
 

@@ -58,6 +58,7 @@ import com.safetravel.tracker.ui.components.travel.*
 import com.safetravel.tracker.ui.components.GlassBottomSheetContainer
 import com.safetravel.tracker.ui.components.PermissionDisclosureDialog
 import com.safetravel.tracker.ui.components.SafetyPermissionType
+import com.safetravel.tracker.ui.components.ToastType
 import com.safetravel.tracker.ui.theme.*
 import com.safetravel.tracker.viewmodel.SafeTravelViewModel
 import com.safetravel.tracker.viewmodel.GeocodeSuggestion
@@ -177,7 +178,7 @@ fun TravelScreen(vm: SafeTravelViewModel) {
     val context = LocalContext.current
     LaunchedEffect(actionFeedbackMessage) {
         actionFeedbackMessage?.let { msg ->
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            vm.showToast(msg)
             vm.actionFeedbackMessage.value = null
         }
     }
@@ -224,7 +225,8 @@ fun TravelScreen(vm: SafeTravelViewModel) {
         },
         currentBearing = currentBearing,
         isMapFullscreen = isMapFullscreen,
-        onToggleFullscreen = { vm.isMapFullscreen.value = !vm.isMapFullscreen.value }
+        onToggleFullscreen = { vm.isMapFullscreen.value = !vm.isMapFullscreen.value },
+        onShowToast = { msg, title, type -> vm.showToast(msg, title, type) }
     )
 }
 
@@ -268,7 +270,8 @@ fun TravelScreenContent(
     onUploadAudio: (java.io.File, String?, Int, String) -> Unit = { _, _, _, _ -> },
     currentBearing: Float = 0f,
     isMapFullscreen: Boolean = false,
-    onToggleFullscreen: () -> Unit = {}
+    onToggleFullscreen: () -> Unit = {},
+    onShowToast: (String, String?, ToastType) -> Unit = { _, _, _ -> }
 ) {
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -401,9 +404,9 @@ fun TravelScreenContent(
                 if (result != null && result.secureUrl.isNotBlank()) {
                     vehiclePhotoUploaded = true
                     currentVehiclePhotoUrl = result.secureUrl
-                    Toast.makeText(context, "Vehicle photo attached successfully.", Toast.LENGTH_SHORT).show()
+                    onShowToast("Vehicle photo attached successfully.", "Vehicle Photo", ToastType.SUCCESS)
                 } else {
-                    Toast.makeText(context, "Failed to upload photo. Please check internet connection.", Toast.LENGTH_SHORT).show()
+                    onShowToast("Failed to upload photo. Please check internet connection.", "Upload Failed", ToastType.ERROR)
                 }
             }
         }
@@ -437,10 +440,10 @@ fun TravelScreenContent(
             val started = AudioRecordHelper.startRecording(context, tripId)
             isRecordingAudio = started
             if (started) {
-                Toast.makeText(context, "Silent Audio Blackbox active.", Toast.LENGTH_SHORT).show()
+                onShowToast("Silent Audio Blackbox active.", "Blackbox Active", ToastType.INFO)
             }
         } else {
-            Toast.makeText(context, "Microphone permission needed for Audio Blackbox", Toast.LENGTH_SHORT).show()
+            onShowToast("Microphone permission needed for Audio Blackbox", "Permission Required", ToastType.WARNING)
         }
     }
     
@@ -956,7 +959,7 @@ fun TravelScreenContent(
                                 if (destinationInput.isNotBlank()) {
                                     isRouteCardDismissed = false
                                 } else {
-                                    Toast.makeText(context, "Please tap on the map to set a destination first!", Toast.LENGTH_SHORT).show()
+                                    onShowToast("Please tap on the map to set a destination first!", "Destination Required", ToastType.WARNING)
                                 }
                             }
                         }
@@ -1027,8 +1030,8 @@ fun TravelScreenContent(
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 scope.launch {
                                     if (vehiclePlate.isBlank() && (transportMode == 2 || transportMode == 3)) {
-                                        val errorMsg = if (transportMode == 3) "Please enter bus name!" else "Please enter vehicle plate number!"
-                                        Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                                        val errorMsg = if (transportMode == 2) "Please enter vehicle registration / plate number" else "Please enter train details"
+                                        onShowToast(errorMsg, "Vehicle Details Required", ToastType.WARNING)
                                         return@launch
                                     }
                                     onEmergencyPhoneChange(tempEmergencyPhone)
@@ -1343,9 +1346,9 @@ fun TravelScreenContent(
                         isRecordingAudio = false
                         if (file != null && file.exists()) {
                             onUploadAudio(file, activeTrip?.id, dur, "manual_toolkit")
-                            Toast.makeText(context, "Audio Blackbox secured & uploading...", Toast.LENGTH_SHORT).show()
+                            onShowToast("Audio Blackbox secured & uploading...", "Audio Uploading", ToastType.INFO)
                         } else {
-                            Toast.makeText(context, "Audio recording saved securely to device.", Toast.LENGTH_SHORT).show()
+                            onShowToast("Audio recording saved securely to device.", "Audio Saved", ToastType.SUCCESS)
                         }
                     } else {
                         val hasPermission = ContextCompat.checkSelfPermission(
@@ -1358,7 +1361,7 @@ fun TravelScreenContent(
                             val started = AudioRecordHelper.startRecording(context, tripId)
                             isRecordingAudio = started
                             if (started) {
-                                Toast.makeText(context, "Silent Audio Blackbox active.", Toast.LENGTH_SHORT).show()
+                                onShowToast("Silent Audio Blackbox active.", "Blackbox Active", ToastType.INFO)
                             }
                         } else {
                             showAudioDisclosureDialog = true
@@ -1375,7 +1378,7 @@ fun TravelScreenContent(
                         }
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        Toast.makeText(context, "Could not open dialer", Toast.LENGTH_SHORT).show()
+                        onShowToast("Could not open dialer", "Dialer Error", ToastType.ERROR)
                     }
                 },
                 onDismiss = { showSafetyToolkit = false }

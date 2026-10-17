@@ -47,7 +47,9 @@ import com.safetravel.tracker.ui.theme.Emerald400
 import com.safetravel.tracker.ui.theme.Slate700
 import com.safetravel.tracker.ui.theme.Slate800
 import com.safetravel.tracker.ui.theme.Slate900
+import com.safetravel.tracker.util.MapRouteUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -126,7 +128,9 @@ fun HistoryMapContent(
 
     // Interactive states
     var is3DMode by remember { mutableStateOf(false) }
-    var plannedPath by remember { mutableStateOf<List<Point>>(emptyList()) }
+    var plannedPath by remember(startPoint, endPoint, plannedRoute) { 
+        mutableStateOf<List<Point>>(plannedRoute ?: emptyList()) 
+    }
 
     // Fetch planned path (Red Line) - If plannedRoute is stored in database, use it directly (0 API calls!)
     LaunchedEffect(startPoint, endPoint, transportMode, mapboxToken, plannedRoute) {
@@ -172,17 +176,60 @@ fun HistoryMapContent(
         }
     }
 
-    // Determine initial camera center
-    val initialCenter = remember(startPoint, recordedPath) {
-        startPoint ?: recordedPath?.firstOrNull() ?: Point.fromLngLat(90.4125, 23.8103)
+    // 1. Calculate complete route bounds for auto-fit camera
+    val allRoutePoints = remember(startPoint, endPoint, recordedPath, plannedPath) {
+        val list = mutableListOf<Point>()
+        startPoint?.let { list.add(it) }
+        endPoint?.let { list.add(it) }
+        recordedPath?.let { list.addAll(it) }
+        if (list.size < 2 && plannedPath.isNotEmpty()) {
+            list.addAll(plannedPath)
+        }
+        list
+    }
+
+    val boundsInfo = remember(allRoutePoints) {
+        MapRouteUtils.calculateRouteBounds(allRoutePoints, startPoint)
     }
 
     val mapViewportState = rememberMapViewportState {
         setCameraOptions {
-            center(initialCenter)
-            zoom(14.5)
+            center(boundsInfo.center)
+            zoom(boundsInfo.zoom)
             pitch(0.0)
             bearing(0.0)
+        }
+    }
+
+    // Auto-fit camera smoothly whenever bounds are ready
+    LaunchedEffect(boundsInfo) {
+        mapViewportState.flyTo(
+            CameraOptions.Builder()
+                .center(boundsInfo.center)
+                .zoom(boundsInfo.zoom)
+                .build()
+        )
+    }
+
+    // 2. Route Replay State
+    var isPlaying by remember(startPoint, endPoint, recordedPath) { mutableStateOf(false) }
+    var replayIndex by remember(startPoint, endPoint, recordedPath) { mutableIntStateOf(0) }
+    val replayPoints = remember(recordedPath, plannedPath) {
+        if (!recordedPath.isNullOrEmpty() && recordedPath.size >= 2) recordedPath
+        else plannedPath
+    }
+
+    LaunchedEffect(isPlaying, replayPoints) {
+        if (isPlaying && replayPoints.size >= 2) {
+            while (isPlaying) {
+                delay(120)
+                if (replayIndex < replayPoints.size - 1) {
+                    replayIndex++
+                } else {
+                    delay(800)
+                    replayIndex = 0
+                }
+            }
         }
     }
 
@@ -194,39 +241,39 @@ fun HistoryMapContent(
             logo = {},
             attribution = {}
         ) {
-            // 1. Draw planned path (Red Line - Background)
+            // 1. Draw planned path (Subtle Red/Coral Line - Background)
             if (plannedPath.isNotEmpty()) {
                 key(plannedPath) {
                     PolylineAnnotation(
                         points = plannedPath,
-                        lineColorString = "#EF4444", // Tailwind Red-500
+                        lineColorString = "#EF4444",
                         lineWidth = 4.0,
-                        lineOpacity = 0.6
+                        lineOpacity = 0.5
                     )
                 }
             }
 
-            // 2. Draw recorded path (Actual Path - Blue with white core)
+            // 2. Draw recorded path (Glowing Cyber Cyan with Bright Emerald Core)
             if (!recordedPath.isNullOrEmpty() && recordedPath.size >= 2) {
                 key(recordedPath) {
-                    // Secondary blue glow path
+                    // Outer Cyber Cyan Glow
                     PolylineAnnotation(
                         points = recordedPath,
-                        lineColorString = "#3B82F6", // Primary Blue
-                        lineWidth = 6.0,
-                        lineOpacity = 1.0
+                        lineColorString = "#06B6D4",
+                        lineWidth = 7.0,
+                        lineOpacity = 0.85
                     )
-                    // Main white core path for neon effect
+                    // Inner Bright Emerald Neon Core
                     PolylineAnnotation(
                         points = recordedPath,
-                        lineColorString = "#FFFFFF",
-                        lineWidth = 2.0,
-                        lineOpacity = 0.9
+                        lineColorString = "#10B981",
+                        lineWidth = 3.0,
+                        lineOpacity = 1.0
                     )
                 }
             }
 
-            // 3. Markers (Teardrop Design from Image)
+            // 3. Start Marker (Emerald Green Flag Pin)
             val actualStart = startPoint ?: recordedPath?.firstOrNull()
             if (actualStart != null) {
                 ViewAnnotation(
@@ -235,10 +282,11 @@ fun HistoryMapContent(
                         .allowOverlap(true)
                         .build()
                 ) {
-                    HistoryTeardropMarker(color = Color(0xFF10B981), icon = Icons.Default.Flag) // Green for start
+                    HistoryTeardropMarker(color = Color(0xFF10B981), icon = Icons.Default.Flag)
                 }
             }
 
+            // 4. End Marker (High-Contrast Red Destination Pin)
             val actualEnd = endPoint ?: recordedPath?.lastOrNull()
             if (actualEnd != null) {
                 ViewAnnotation(
@@ -247,7 +295,39 @@ fun HistoryMapContent(
                         .allowOverlap(true)
                         .build()
                 ) {
-                    HistoryTeardropMarker(color = Color(0xFF6366F1), icon = Icons.Default.Place) // Blue/Purple for end
+                    HistoryTeardropMarker(color = Color(0xFFEF4444), icon = Icons.Default.Place)
+                }
+            }
+
+            // 5. Moving Animated Replay Vehicle Marker
+            val currentReplayPoint = if (isPlaying || replayIndex > 0) replayPoints.getOrNull(replayIndex) else null
+            if (currentReplayPoint != null) {
+                ViewAnnotation(
+                    options = ViewAnnotationOptions.Builder()
+                        .annotatedFeature(AnnotatedFeature.valueOf(currentReplayPoint))
+                        .allowOverlap(true)
+                        .build()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF06B6D4))
+                            .border(2.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val transportIcon = when (transportMode?.lowercase()) {
+                            "walking" -> Icons.Default.DirectionsWalk
+                            "cycling", "bike" -> Icons.Default.DirectionsBike
+                            else -> Icons.Default.DirectionsCar
+                        }
+                        Icon(
+                            imageVector = transportIcon,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -312,6 +392,57 @@ fun HistoryMapContent(
                         .zoom(if (is3DMode) 15.5 else 14.5)
                         .build()
                 )
+            }
+        }
+
+        // 4. Interactive Route Replay Floating Bar
+        if (replayPoints.size >= 2) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (isFullscreen) 32.dp else 12.dp)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = Slate900.copy(alpha = 0.92f),
+                border = BorderStroke(1.dp, Color(0x5506B6D4))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { isPlaying = !isPlaying },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = Color(0xFF06B6D4),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isPlaying) "Replaying..." else "Replay Route",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Slider(
+                        value = if (replayPoints.isNotEmpty()) replayIndex.toFloat() / (replayPoints.size - 1) else 0f,
+                        onValueChange = { frac ->
+                            isPlaying = false
+                            replayIndex = (frac * (replayPoints.size - 1)).toInt()
+                        },
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFF06B6D4),
+                            activeTrackColor = Color(0xFF06B6D4),
+                            inactiveTrackColor = Slate700
+                        ),
+                        modifier = Modifier.width(110.dp).height(24.dp)
+                    )
+                }
             }
         }
     }

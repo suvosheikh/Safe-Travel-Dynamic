@@ -247,7 +247,7 @@ private fun formatNewsTimestamp(rawTimestamp: String?): String {
     val trimmed = rawTimestamp.trim()
     // If it's already a relative or human-readable format (e.g. "15 minutes ago", "Just now"), return as is
     if (!trimmed.first().isDigit()) return trimmed
-    return DateTimeUtils.formatBstDateTime(trimmed, "dd MMM yyyy, hh:mm a").ifBlank { trimmed }
+    return DateTimeUtils.formatAppDateTime(trimmed).ifBlank { trimmed }
 }
 
 @androidx.compose.ui.tooling.preview.Preview
