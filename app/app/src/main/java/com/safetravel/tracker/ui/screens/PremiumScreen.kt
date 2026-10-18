@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.safetravel.tracker.ui.components.GlassBottomSheetContainer
+import com.safetravel.tracker.ui.components.PremiumPlanCard
 import com.safetravel.tracker.supabase.SupabaseManager
 import com.safetravel.tracker.supabase.SupabasePaymentTransaction
 import com.safetravel.tracker.supabase.SupabaseSubscriptionPlan
@@ -525,327 +526,38 @@ fun PremiumScreen(
                     )
                 }
             } else {
-                items(displayedPlans) { plan ->
-                    val hasDiscount = plan.discountPrice != null && plan.discountPrice < plan.price
-                    val effectivePrice = plan.discountPrice ?: plan.price
-                    val isCurrentActivePlan = isPremium && (plan.id == currentActivePlan?.id)
-                    val isLowerTier = isPremium && !isCurrentActivePlan && currentActivePlan != null && plan.durationDays < currentActivePlan.durationDays
-                    val isHigherTier = isPremium && !isCurrentActivePlan && currentActivePlan != null && plan.durationDays >= currentActivePlan.durationDays
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 5.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = if (isCurrentActivePlan) Slate800 else Slate850),
-                        border = BorderStroke(
-                            width = if (isCurrentActivePlan) 1.5.dp else 1.dp,
-                            color = when {
-                                isCurrentActivePlan -> Emerald400.copy(alpha = 0.85f)
-                                plan.isPopular -> PremiumGold.copy(alpha = 0.8f)
-                                else -> Slate700
+                items(displayedPlans, key = { it.id }) { plan ->
+                    PremiumPlanCard(
+                        plan = plan,
+                        isPremium = isPremium,
+                        currentActivePlan = currentActivePlan,
+                        daysRemaining = daysRemaining,
+                        hasPending = pendingTx != null,
+                        onSelectPlan = { selectedPlan ->
+                            if (pendingTx != null) {
+                                Toast.makeText(
+                                    context,
+                                    "You have a pending verification request. Please wait for admin approval.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                checkoutPlan = selectedPlan
+                                senderNumber = profile?.phoneNumber ?: ""
+                                transactionId = ""
                             }
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp)
-                        ) {
-                            // Top Row: Badges
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (isCurrentActivePlan) {
-                                    Surface(
-                                        color = Emerald400.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(6.dp),
-                                        border = BorderStroke(1.dp, Emerald400.copy(alpha = 0.5f))
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.CheckCircle,
-                                                contentDescription = null,
-                                                tint = Emerald400,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "CURRENT ACTIVE PLAN",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = Emerald400
-                                            )
-                                        }
-                                    }
-                                } else if (plan.isPopular) {
-                                    Surface(
-                                        color = PremiumGold.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(6.dp),
-                                        border = BorderStroke(1.dp, PremiumGold.copy(alpha = 0.4f))
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Star,
-                                                contentDescription = null,
-                                                tint = PremiumGold,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "MOST POPULAR",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = PremiumGold
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    Spacer(modifier = Modifier.width(1.dp))
-                                }
-
-                                Surface(
-                                    color = Slate700.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    val badgeLabel = when {
-                                        plan.planType == "trip_credits" || plan.billingPeriod == "pay_per_trip" -> "${plan.creditsCount} TRIPS PACK"
-                                        plan.durationDays == 1 -> "1 DAY PASS"
-                                        else -> "${plan.durationDays} DAYS PASS"
-                                    }
-                                    Text(
-                                        text = badgeLabel,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Slate300,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Plan Title
-                            Text(
-                                text = plan.name,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color.White
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            // Price
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = "BDT ${effectivePrice.toInt()}",
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White
-                                )
-
-                                if (hasDiscount) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "BDT ${plan.price.toInt()}",
-                                        fontSize = 13.sp,
-                                        color = Slate500,
-                                        textDecoration = TextDecoration.LineThrough,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-
-                                val subText = if (plan.planType == "trip_credits" || plan.billingPeriod == "pay_per_trip") {
-                                    " / ${plan.creditsCount} trips (${plan.durationDays} days valid)"
-                                } else {
-                                    " / ${plan.durationDays} days"
-                                }
-                                Text(
-                                    text = subText,
-                                    fontSize = 11.sp,
-                                    color = Slate400,
-                                    modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Features
-                            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                plan.features.forEach { feat ->
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = null,
-                                            tint = Emerald400,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = feat,
-                                            fontSize = 12.sp,
-                                            color = Slate300
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            val hasPending = pendingTx != null
-
-                            // Contextual Action Button based on subscription state
-                            when {
-                                isCurrentActivePlan -> {
-                                    if (daysRemaining != null && daysRemaining <= 7) {
-                                        Button(
-                                            onClick = {
-                                                if (hasPending) {
-                                                    Toast.makeText(context, "Verification in progress for previous request.", Toast.LENGTH_LONG).show()
-                                                } else {
-                                                    checkoutPlan = plan
-                                                    senderNumber = profile?.phoneNumber ?: ""
-                                                    transactionId = ""
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxWidth().height(44.dp),
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Emerald500)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Autorenew, contentDescription = null, tint = Slate950, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = "Renew Plan (+${plan.durationDays} Days)",
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = Slate950
-                                                )
-                                            }
-                                        }
-                                    } else {
-                                        Surface(
-                                            modifier = Modifier.fillMaxWidth().height(44.dp),
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = Slate800,
-                                            border = BorderStroke(1.dp, Emerald400.copy(alpha = 0.5f))
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxSize(),
-                                                horizontalArrangement = Arrangement.Center,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Emerald400, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = "Active Plan (${daysRemaining ?: 0} Days Remaining)",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Emerald400
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                isLowerTier -> {
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = Slate900,
-                                        border = BorderStroke(1.dp, Slate800)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxSize(),
-                                            horizontalArrangement = Arrangement.Center,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(Icons.Default.Lock, contentDescription = null, tint = Slate500, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "Included in Active Plan",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Slate400
-                                            )
-                                        }
-                                    }
-                                }
-                                isHigherTier -> {
-                                    Button(
-                                        onClick = {
-                                            if (hasPending) {
-                                                Toast.makeText(context, "Verification in progress for previous request.", Toast.LENGTH_LONG).show()
-                                            } else {
-                                                switchPlanConfirmation = plan
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Cyan500)
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.Upgrade, contentDescription = null, tint = Slate950, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Upgrade to ${plan.name}",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = Slate950
-                                            )
-                                        }
-                                    }
-                                }
-                                else -> {
-                                    Button(
-                                        onClick = {
-                                            if (hasPending) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "You have a pending verification request. Please wait for admin approval.",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                            } else {
-                                                checkoutPlan = plan
-                                                senderNumber = profile?.phoneNumber ?: ""
-                                                transactionId = ""
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(44.dp),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (hasPending) Slate800 else if (plan.isPopular) PremiumGold else Cyan500
-                                        )
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = if (hasPending) Icons.Default.HourglassTop else Icons.Default.Payment,
-                                                contentDescription = null,
-                                                tint = if (hasPending) Color(0xFFF59E0B) else Slate950,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = if (hasPending) "Verification In Progress" else "Subscribe via Mobile Banking",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = if (hasPending) Color(0xFFF59E0B) else Slate950
-                                            )
-                                        }
-                                    }
-                                }
+                        },
+                        onUpgradePlan = { selectedPlan ->
+                            if (pendingTx != null) {
+                                Toast.makeText(
+                                    context,
+                                    "Verification in progress for previous request.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                switchPlanConfirmation = selectedPlan
                             }
                         }
-                    }
+                    )
                 }
             }
         }
