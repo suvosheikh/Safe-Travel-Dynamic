@@ -495,7 +495,8 @@ fun NativeMapLibreView(
         }
     }
 
-    LaunchedEffect(hasLocationPermission) {
+    LaunchedEffect(hasLocationPermission, liveUserCoordinates) {
+        if (liveUserCoordinates != null) return@LaunchedEffect
         if (hasLocationPermission) {
             try {
                 val loc = LocationHelper.getCurrentLocation(context)
@@ -509,7 +510,8 @@ fun NativeMapLibreView(
         }
     }
 
-    LaunchedEffect(deviceCoords) {
+    LaunchedEffect(deviceCoords, liveUserCoordinates) {
+        if (liveUserCoordinates != null) return@LaunchedEffect
         deviceCoords?.let { (lat, lng) ->
             if (lat != 0.0 && lng != 0.0) {
                 onDeviceLocationChanged(lat, lng)
@@ -945,13 +947,28 @@ fun NativeMapLibreView(
             }
 
             // Live Traveled Trail (Breadcrumbs log from GPS/Supabase)
-            // Locks the tip of the trail line directly to the user's puck so the line never jumps ahead of the user
+            // Smoothly extends the breadcrumb trail to the user's current puck position without mutating prior fixes
             val displayedTraveledPath = remember(liveRoutePath, userPoint) {
                 if (liveRoutePath.isNullOrEmpty()) {
                     null
-                } else if (userPoint != null && liveRoutePath.size >= 1) {
-                    val basePoints = if (liveRoutePath.size > 1) liveRoutePath.dropLast(1) else emptyList()
-                    basePoints + userPoint
+                } else if (userPoint != null) {
+                    val last = liveRoutePath.lastOrNull()
+                    if (last != null) {
+                        val distResults = FloatArray(1)
+                        android.location.Location.distanceBetween(
+                            last.latitude(), last.longitude(),
+                            userPoint.latitude(), userPoint.longitude(),
+                            distResults
+                        )
+                        // If userPoint is within clean connecting range (1.0m to 35.0m), connect seamlessly to puck
+                        if (distResults[0] in 1.0f..35.0f) {
+                            liveRoutePath + userPoint
+                        } else {
+                            liveRoutePath
+                        }
+                    } else {
+                        liveRoutePath
+                    }
                 } else {
                     liveRoutePath
                 }

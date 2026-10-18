@@ -1591,8 +1591,15 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     fun updateLiveCoordinatesInSupabase(lat: Double, lng: Double) {
         val currentTrip = activeTrip.value ?: return
         viewModelScope.launch {
+            // 0. Apply route corridor snapping if a planned route is active (eliminates roadside building jitter)
+            val (correctedLat, correctedLng) = com.safetravel.tracker.util.RouteCorridorFilter.snapToCorridorIfApplicable(
+                lat = lat,
+                lng = lng,
+                plannedRoute = currentTrip.plannedRouteLog
+            )
+
             // 1. Update local path log with seamless historical stitching (zero data loss across app kills)
-            val newPoint = mapOf("lat" to lat, "lng" to lng)
+            val newPoint = mapOf("lat" to correctedLat, "lng" to correctedLng)
             val context = getApplication<Application>()
             val cachedTrail = com.safetravel.tracker.util.ActiveTripTrailCache.loadTrail(context, currentTrip.id)
             val updatedPath = com.safetravel.tracker.util.ActiveTripTrailCache.stitchTrail(
@@ -1613,8 +1620,8 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             val speed = currentSpeedKmh.value
             val heading = lastFilteredLocation?.bearing ?: 0f
             SupabaseRealtimeBroadcaster.sendLocation(
-                lat = lat,
-                lng = lng,
+                lat = correctedLat,
+                lng = correctedLng,
                 speedKmh = speed,
                 heading = heading,
                 battery = currentBat
@@ -1656,6 +1663,11 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun onManualLocationUpdate(lat: Double, lng: Double) {
+        // When a trip is actively ongoing, live telemetry is strictly governed by the filtered pipeline
+        if (activeTrip.value != null) {
+            return
+        }
+
         currentPosition.value = Pair(lat, lng)
         LocationHelper.saveLastSavedLocation(getApplication(), lat, lng)
         
@@ -1667,11 +1679,6 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
                     travelOriginInput.value = name
                 }
             }
-        }
-
-        // Only upload telemetry if there is an active trip
-        if (activeTrip.value != null) {
-            updateLiveCoordinatesInSupabase(lat, lng)
         }
     }
 
@@ -1743,7 +1750,22 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         }
 
         lastFilteredLocation = smoothed
-        onManualLocationUpdate(lat, lng)
+        currentPosition.value = Pair(lat, lng)
+        LocationHelper.saveLastSavedLocation(getApplication(), lat, lng)
+
+        if (activeTrip.value != null) {
+            updateLiveCoordinatesInSupabase(lat, lng)
+        } else {
+            if (travelOriginInput.value == "Locating..." || travelOriginInput.value == "Unknown Location") {
+                viewModelScope.launch {
+                    val name = LocationHelper.getPlaceName(getApplication(), lat, lng)
+                    if (name.isNotBlank() && name != "Unknown Location") {
+                        travelOriginInput.value = name
+                    }
+                }
+            }
+        }
+
         updateCurrentLocationName(getApplication(), lat, lng)
         Log.d("SafeTravelVM", "Adaptive Filtered Location: $lat, $lng (mode=$mode, accuracy=${if (smoothed.hasAccuracy()) smoothed.accuracy else "N/A"}m)")
     }

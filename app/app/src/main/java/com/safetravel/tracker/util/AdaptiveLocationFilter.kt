@@ -43,6 +43,7 @@ class AdaptiveLocationFilter {
         varianceP = 64.0
         lastTimestampMs = 0L
         lastAcceptedLocation = null
+        RouteCorridorFilter.reset()
         Log.d(TAG, "AdaptiveLocationFilter reset.")
     }
 
@@ -127,27 +128,47 @@ class AdaptiveLocationFilter {
             }
         }
 
-        // STAGE 1: Outlier Rejection (Signal Integrity)
-        // 1.1 Degraded Accuracy Check (bounced radio waves)
-        if (rawAccuracy > maxAllowedAccuracy) {
-            Log.d(TAG, "Dropped outlier: accuracy (${rawAccuracy}m) exceeds threshold (${maxAllowedAccuracy}m)")
-            return null
-        }
-
-        // 1.2 Teleportation / Infeasible Velocity Check
+        // STAGE 1: Outlier Rejection (Signal Integrity & Urban Canyon Multipath Guard)
         val rawDistResults = FloatArray(1)
         Location.distanceBetween(prev.latitude, prev.longitude, rawLat, rawLng, rawDistResults)
         val rawDistanceMoved = rawDistResults[0]
         val impliedSpeedMps = rawDistanceMoved / deltaTimeSec
 
-        if (impliedSpeedMps > maxPlausibleSpeedMps) {
-            Log.w(TAG, "Dropped teleportation glitch: speed=${impliedSpeedMps}m/s exceeds max=${maxPlausibleSpeedMps}m/s")
+        // 1.1 Degraded Accuracy Check (bounced radio waves under Metro Rail/tall buildings)
+        val prevSpeed = if (prev.hasSpeed()) prev.speed else impliedSpeedMps.toFloat()
+        val effectiveMaxAccuracy = if (prevSpeed < 3.0f) {
+            minOf(maxAllowedAccuracy, 24.0f) // Stricter accuracy limit during slow traffic/stops to reject building bounces
+        } else {
+            maxAllowedAccuracy
+        }
+
+        if (rawAccuracy > effectiveMaxAccuracy) {
+            Log.d(TAG, "Dropped outlier: accuracy (${rawAccuracy}m) exceeds dynamic threshold (${effectiveMaxAccuracy}m)")
+            return null
+        }
+
+        // 1.2 Speed-Aware Dynamic Teleportation Check (Catches 20-30m jumps during slow travel)
+        // Dynamic maximum plausible speed based on current travel pace + physical acceleration limit (4.5 m/s^2)
+        val maxPlausibleAccelerationMps2 = 4.5f
+        val dynamicPlausibleSpeedMps = maxOf(
+            4.0f, // Allow at least ~14 km/h sudden takeoff from standstill
+            prevSpeed + (maxPlausibleAccelerationMps2 * deltaTimeSec.toFloat())
+        ).coerceAtMost(maxPlausibleSpeedMps)
+
+        val maxAllowedDistanceForInterval = maxOf(
+            7.5f,
+            (dynamicPlausibleSpeedMps * deltaTimeSec.toFloat()) + (rawAccuracy * 0.35f)
+        )
+
+        if (rawDistanceMoved > maxAllowedDistanceForInterval && impliedSpeedMps > dynamicPlausibleSpeedMps) {
+            Log.w(TAG, "Dropped multipath jump: dist=${rawDistanceMoved}m in ${deltaTimeSec}s (implied speed=${impliedSpeedMps}m/s > max=${dynamicPlausibleSpeedMps}m/s)")
             return null
         }
 
         // STAGE 2: Stillness / Deadband Locking (Prevents jitter at traffic lights & stops)
         val isStationary = (rawLocation.hasSpeed() && rawLocation.speed < stillSpeedThresholdMps) ||
-                (impliedSpeedMps < stillSpeedThresholdMps)
+                (impliedSpeedMps < stillSpeedThresholdMps) ||
+                (prevSpeed < stillSpeedThresholdMps && rawDistanceMoved < 5.0f)
         
         if (isStationary && rawDistanceMoved < stillDistanceThresholdMeters) {
             // User/vehicle is stationary. Hold previous position rock-solid to eliminate map dancing

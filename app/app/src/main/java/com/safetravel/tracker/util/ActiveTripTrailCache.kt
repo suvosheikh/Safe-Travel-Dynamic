@@ -85,11 +85,17 @@ object ActiveTripTrailCache {
             val lng = newPoint["lng"] ?: 0.0
             if (lat != 0.0 && lng != 0.0) {
                 val last = combined.lastOrNull()
-                val lastLat = last?.get("lat") ?: 0.0
-                val lastLng = last?.get("lng") ?: 0.0
-                // Avoid redundant identical micro-points
-                if (Math.abs(lat - lastLat) > 0.00001 || Math.abs(lng - lastLng) > 0.00001) {
+                if (last == null) {
                     combined.add(newPoint)
+                } else {
+                    val lastLat = last["lat"] ?: 0.0
+                    val lastLng = last["lng"] ?: 0.0
+                    val distResults = FloatArray(1)
+                    android.location.Location.distanceBetween(lastLat, lastLng, lat, lng, distResults)
+                    // Require at least 4.5m of actual movement to eliminate stationary intersection jitter/webs
+                    if (distResults[0] >= 4.5f) {
+                        combined.add(newPoint)
+                    }
                 }
             }
         }
