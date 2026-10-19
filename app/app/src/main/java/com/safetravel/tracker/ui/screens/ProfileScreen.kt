@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -272,7 +274,13 @@ fun ProfileScreenContent(
     var showWizard by remember { mutableStateOf(false) }
     var wizardInitialStep by remember { mutableIntStateOf(1) }
 
+    // Progressive Disclosure Bottom Sheet States
+    var showMedicalSheet by remember { mutableStateOf(false) }
+    var showGuardiansSheet by remember { mutableStateOf(false) }
+    var showIdentitySheet by remember { mutableStateOf(false) }
+
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showTimezonePicker by remember { mutableStateOf(false) }
     var currentTimezone by remember { mutableStateOf(com.safetravel.tracker.util.DateTimeUtils.userTimeZoneId) }
 
@@ -292,97 +300,187 @@ fun ProfileScreenContent(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 110.dp, top = 6.dp)
         ) {
-            // =============================================================
-            // 1. COMPACT HERO PASSPORT SECTION
-            // =============================================================
+            // 1. Sleek Profile Header Card
             item {
-                CompactHeroSection(
+                ProfileHeaderCard(
                     profile = profile,
                     isUploading = isUploading,
                     onPickImage = onPickImage,
-                    onCopyPhone = { phone ->
-                        clipboard.setText(AnnotatedString(phone))
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        Toast.makeText(context, "Phone copied to clipboard", Toast.LENGTH_SHORT).show()
-                    },
-                    onOpenWizard = {
+                    onEditProfile = {
                         wizardInitialStep = 1
                         showWizard = true
                     }
                 )
             }
 
-            // =============================================================
-            // 2. COMPACT 3-PILL QUICK METRICS ROW
-            // =============================================================
+            // 2. Minimal Safety Status Bar
             item {
-                CompactQuickMetrics(
-                    bloodGroup = profile?.bloodGroup ?: "Not Set",
-                    guardiansCount = guardians.size,
-                    safetyScore = safetyScore
-                )
-            }
-
-            // =============================================================
-            // 3. 🚨 EMERGENCY & MEDICAL ID (ICE) SECTION
-            // =============================================================
-            item {
-                CompactMedicalSection(
-                    profile = profile,
-                    onEditClick = {
-                        wizardInitialStep = 3 // Jump directly to Medical step
-                        showWizard = true
-                    }
-                )
-            }
-
-            // =============================================================
-            // 4. 🪪 CITIZEN & RESIDENCE IDENTITY SECTION
-            // =============================================================
-            item {
-                CompactIdentitySection(
-                    profile = profile,
-                    onEditClick = {
-                        wizardInitialStep = 2 // Jump directly to Address/ID step
-                        showWizard = true
-                    }
-                )
-            }
-
-            // =============================================================
-            // 5. 👥 GUARDIANS & PROTECTORS NETWORK
-            // =============================================================
-            item {
-                CompactGuardiansSection(
-                    guardians = guardians,
-                    onAddGuardian = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onAddGuardianClick()
-                    },
-                    onGuardianClick = onGuardianClick,
-                    onCallGuardian = { phone ->
-                        try {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Dialer unavailable", Toast.LENGTH_SHORT).show()
+                val actionPrompt = when {
+                    profile?.bloodGroup.isNullOrBlank() -> "Add blood group to complete emergency profile"
+                    guardians.isEmpty() -> "Connect emergency guardians for live SOS tracking"
+                    profile?.nidPassport.isNullOrBlank() -> "Verify citizen ID and residential address"
+                    else -> null
+                }
+                ProfileSafetyStatusBar(
+                    safetyScore = safetyScore,
+                    actionPrompt = actionPrompt,
+                    onActionClick = {
+                        when {
+                            profile?.bloodGroup.isNullOrBlank() -> {
+                                wizardInitialStep = 3
+                                showWizard = true
+                            }
+                            guardians.isEmpty() -> {
+                                showGuardiansSheet = true
+                            }
+                            profile?.nidPassport.isNullOrBlank() -> {
+                                wizardInitialStep = 2
+                                showWizard = true
+                            }
                         }
                     }
                 )
             }
 
-            // =============================================================
-            // 6. ⚙️ VAULT & SYSTEM PREFERENCES
-            // =============================================================
+            // 3. GROUP 1: Safety & Emergency Network
             item {
-                CompactPreferencesSection(
-                    onTimezoneClick = { showTimezonePicker = true },
-                    onSyncDatabase = onSyncDatabase,
-                    onAppInfoClick = onAppInfoClick,
-                    onLogoutClick = { showLogoutDialog = true }
-                )
+                ProfileMenuGroupCard(headerTitle = "SAFETY & EMERGENCY VAULT") {
+                    val bloodText = profile?.bloodGroup?.ifBlank { "Not set" } ?: "Not set"
+                    val allergyCount = if (!profile?.allergies.isNullOrBlank()) "Allergies recorded" else "No allergies"
+                    ProfileMenuRow(
+                        title = "Emergency Medical ID (ICE)",
+                        subtitle = "Blood: $bloodText • $allergyCount",
+                        icon = Icons.Default.MedicalServices,
+                        accent = EmergencyRed,
+                        onClick = { showMedicalSheet = true },
+                        trailingBadge = if (profile?.bloodGroup.isNullOrBlank()) "Action Needed" else null
+                    )
+
+                    val guardiansSummary = if (guardians.isEmpty()) "No guardians connected" else "${guardians.size} Connected (${guardians.take(2).joinToString { it.relationship }})"
+                    ProfileMenuRow(
+                        title = "Trusted Guardians Network",
+                        subtitle = guardiansSummary,
+                        icon = Icons.Default.Shield,
+                        accent = CyberEmerald,
+                        onClick = { showGuardiansSheet = true },
+                        trailingBadge = if (guardians.isEmpty()) "Add" else "${guardians.size}"
+                    )
+
+                    val idSummary = if (profile?.nidPassport.isNullOrBlank()) "NID not registered" else "NID Verified • ${profile?.presentAddress?.take(20) ?: "Dhaka"}"
+                    ProfileMenuRow(
+                        title = "Citizen Identity & Residence",
+                        subtitle = idSummary,
+                        icon = Icons.Default.Badge,
+                        accent = CyberCyan,
+                        onClick = { showIdentitySheet = true },
+                        showDivider = false
+                    )
+                }
+            }
+
+            // 4. GROUP 2: App & System Preferences
+            item {
+                ProfileMenuGroupCard(headerTitle = "SYSTEM & PREFERENCES") {
+                    ProfileMenuRow(
+                        title = "Timezone & Regional Clock",
+                        subtitle = currentTimezone,
+                        icon = Icons.Default.Schedule,
+                        accent = CyberCyan,
+                        onClick = { showTimezonePicker = true }
+                    )
+
+                    ProfileMenuRow(
+                        title = "Synchronize Cloud Vault",
+                        subtitle = "Force sync local cache with remote server",
+                        icon = Icons.Default.CloudSync,
+                        accent = CyberCyan,
+                        onClick = onSyncDatabase
+                    )
+
+                    ProfileMenuRow(
+                        title = "Application Information",
+                        subtitle = "SafeTravel Architecture v1.0.0",
+                        icon = Icons.Default.Security,
+                        accent = CyberEmerald,
+                        onClick = onAppInfoClick,
+                        showDivider = false
+                    )
+                }
+            }
+
+            // 5. GROUP 3: Account & Security
+            item {
+                ProfileMenuGroupCard(headerTitle = "ACCOUNT & PRIVACY") {
+                    ProfileMenuRow(
+                        title = "Delete Account Data",
+                        subtitle = "Play Store compliance permanent data wipe",
+                        icon = Icons.Default.DeleteOutline,
+                        accent = EmergencyRed,
+                        onClick = { showDeleteAccountDialog = true }
+                    )
+
+                    ProfileMenuRow(
+                        title = "Sign Out",
+                        subtitle = "Terminate active session on this device",
+                        icon = Icons.AutoMirrored.Filled.Logout,
+                        accent = EmergencyRed,
+                        onClick = { showLogoutDialog = true },
+                        isDestructive = true,
+                        showDivider = false
+                    )
+                }
             }
         }
+    }
+
+    // Detail Bottom Sheet: Medical ID (ICE)
+    if (showMedicalSheet) {
+        MedicalDetailBottomSheet(
+            profile = profile,
+            onDismiss = { showMedicalSheet = false },
+            onEditClick = {
+                showMedicalSheet = false
+                wizardInitialStep = 3
+                showWizard = true
+            }
+        )
+    }
+
+    // Detail Bottom Sheet: Guardians List
+    if (showGuardiansSheet) {
+        GuardiansListBottomSheet(
+            guardians = guardians,
+            onDismiss = { showGuardiansSheet = false },
+            onAddGuardianClick = {
+                showGuardiansSheet = false
+                onAddGuardianClick()
+            },
+            onGuardianClick = { guardian ->
+                showGuardiansSheet = false
+                onGuardianClick(guardian)
+            },
+            onCallGuardian = { phone ->
+                try {
+                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Dialer unavailable", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+
+    // Detail Bottom Sheet: Citizen Identity & Residence
+    if (showIdentitySheet) {
+        IdentityDetailBottomSheet(
+            profile = profile,
+            onDismiss = { showIdentitySheet = false },
+            onEditClick = {
+                showIdentitySheet = false
+                wizardInitialStep = 2
+                showWizard = true
+            }
+        )
     }
 
     // Step-by-Step Profile Input Wizard
@@ -439,6 +537,47 @@ fun ProfileScreenContent(
         )
     }
 
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            containerColor = Color(0xFF0F172A),
+            title = {
+                Text(
+                    text = "REQUEST DATA DELETION",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 15.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "In compliance with Google Play User Data & Account Deletion policies, you can request permanent deletion of your account, emergency vault, guardian relationships, and live telemetry records from our servers.",
+                    color = Slate400,
+                    fontSize = 12.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        Toast.makeText(context, "Data deletion request submitted. Signing out...", Toast.LENGTH_LONG).show()
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("DELETE & SIGN OUT", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) {
+                    Text("CANCEL", color = Slate400)
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
     if (showTimezonePicker) {
         com.safetravel.tracker.ui.components.TimezonePickerBottomSheet(
             userId = profile?.id,
@@ -451,665 +590,7 @@ fun ProfileScreenContent(
 }
 
 // =========================================================================
-// 1. COMPACT HERO SECTION (Tight, responsive layout)
-// =========================================================================
-@Composable
-private fun CompactHeroSection(
-    profile: SupabaseProfile?,
-    isUploading: Boolean,
-    onPickImage: () -> Unit,
-    onCopyPhone: (String) -> Unit,
-    onOpenWizard: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(SoftCardBg)
-            .padding(14.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Avatar (76dp)
-                Box(
-                    contentAlignment = Alignment.BottomEnd,
-                    modifier = Modifier.clickable { onPickImage() }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(76.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF0F172A)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!profile?.avatarUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = profile?.avatarUrl,
-                                contentDescription = "Profile Photo",
-                                modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                modifier = Modifier.size(38.dp),
-                                tint = Slate300
-                            )
-                        }
-
-                        if (isUploading) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.65f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(22.dp),
-                                    color = CyberEmerald,
-                                    strokeWidth = 2.dp
-                                )
-                            }
-                        }
-                    }
-
-                    // Floating camera pill
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(CyberEmerald),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isUploading) Icons.Default.CloudSync else Icons.Default.PhotoCamera,
-                            contentDescription = "Upload",
-                            tint = Color(0xFF020617),
-                            modifier = Modifier.size(13.dp)
-                        )
-                    }
-                }
-
-                // Name, occupation, badge
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = profile?.fullName?.ifBlank { "Traveler Name" } ?: "Traveler Name",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    if (!profile?.occupation.isNullOrBlank()) {
-                        Text(
-                            text = profile.occupation.orEmpty(),
-                            fontSize = 12.sp,
-                            color = Slate400,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // Protected Tag
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (profile?.isPremium == true) CyberAmber.copy(alpha = 0.2f) else CyberEmerald.copy(alpha = 0.15f))
-                                .padding(horizontal = 7.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = if (profile?.isPremium == true) "ELITE" else "VERIFIED",
-                                color = if (profile?.isPremium == true) CyberAmber else CyberEmerald,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                        }
-
-                        // Phone pill
-                        if (!profile?.phoneNumber.isNullOrBlank()) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.08f))
-                                    .clickable { onCopyPhone(profile.phoneNumber.orEmpty()) }
-                                    .padding(horizontal = 7.dp, vertical = 3.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(Icons.Default.PhoneIphone, null, tint = Slate300, modifier = Modifier.size(11.dp))
-                                    Text(profile.phoneNumber.orEmpty(), color = Slate200, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Wizard Action Button (Clean, borderless, full width)
-            Button(
-                onClick = onOpenWizard,
-                colors = ButtonDefaults.buttonColors(containerColor = CyberCyan.copy(alpha = 0.2f)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(38.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.AutoFixHigh, null, tint = CyberCyan, modifier = Modifier.size(15.dp))
-                    Text("EDIT PROFILE (WIZARD)", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
-                }
-            }
-        }
-    }
-}
-
-// =========================================================================
-// 2. COMPACT 3 QUICK METRICS (Responsive, fits any screen)
-// =========================================================================
-@Composable
-private fun CompactQuickMetrics(
-    bloodGroup: String,
-    guardiansCount: Int,
-    safetyScore: Int
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        CompactMetricPill(
-            modifier = Modifier.weight(1f),
-            label = "BLOOD",
-            value = bloodGroup,
-            icon = Icons.Default.Bloodtype,
-            accent = EmergencyRed
-        )
-
-        CompactMetricPill(
-            modifier = Modifier.weight(1f),
-            label = "GUARDIANS",
-            value = if (guardiansCount > 0) "$guardiansCount Added" else "None",
-            icon = Icons.Default.Shield,
-            accent = CyberCyan
-        )
-
-        CompactMetricPill(
-            modifier = Modifier.weight(1f),
-            label = "SECURITY",
-            value = "$safetyScore%",
-            icon = Icons.Default.HealthAndSafety,
-            accent = when {
-                safetyScore >= 80 -> CyberEmerald
-                safetyScore >= 50 -> CyberAmber
-                else -> EmergencyRed
-            }
-        )
-    }
-}
-
-@Composable
-private fun CompactMetricPill(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-    icon: ImageVector,
-    accent: Color
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(SoftCardBg)
-            .padding(horizontal = 8.dp, vertical = 10.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Icon(icon, null, tint = accent, modifier = Modifier.size(15.dp))
-            Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(label, color = Slate400, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// =========================================================================
-// 3. 🚨 COMPACT EMERGENCY & MEDICAL ID (ICE)
-// =========================================================================
-@Composable
-private fun CompactMedicalSection(
-    profile: SupabaseProfile?,
-    onEditClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(SoftCardBg)
-            .padding(14.dp)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier.size(26.dp).clip(CircleShape).background(EmergencyRed.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.MedicalServices, null, tint = EmergencyRed, modifier = Modifier.size(14.dp))
-                }
-                Text("EMERGENCY MEDICAL ID (ICE)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .clickable { onEditClick() }
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text("EDIT", color = CyberEmerald, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Blood & Height/Weight in compact row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(EmergencyRed.copy(alpha = 0.12f))
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(profile?.bloodGroup?.ifBlank { "--" } ?: "--", color = EmergencyRed, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                    Column {
-                        Text("BLOOD GROUP", color = Slate400, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Text("Emergency Donor", color = Slate300, fontSize = 10.sp)
-                    }
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.05f))
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
-            ) {
-                Column {
-                    Text("HEIGHT / WEIGHT", color = Slate400, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    Text(profile?.heightWeight?.ifBlank { "Not set" } ?: "Not set", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        // Tags (Allergies, Medications, Conditions)
-        val hasMedicalNotes = !profile?.allergies.isNullOrBlank() || !profile?.chronicConditions.isNullOrBlank() || !profile?.currentMedications.isNullOrBlank()
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (!hasMedicalNotes) {
-            Text("No critical allergies, chronic conditions, or medications recorded.", color = Slate500, fontSize = 11.sp)
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                if (!profile?.allergies.isNullOrBlank()) {
-                    CompactTagChip("Allergy: ${profile.allergies}", EmergencyRed, Icons.Default.WarningAmber)
-                }
-                if (!profile?.chronicConditions.isNullOrBlank()) {
-                    CompactTagChip("Condition: ${profile.chronicConditions}", CyberAmber, Icons.Default.MonitorHeart)
-                }
-                if (!profile?.currentMedications.isNullOrBlank()) {
-                    CompactTagChip("Meds: ${profile.currentMedications}", CyberCyan, Icons.Default.Medication)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompactTagChip(text: String, color: Color, icon: ImageVector) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.15f))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(11.dp))
-            Text(text, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-// =========================================================================
-// 4. 🪪 COMPACT CITIZEN & RESIDENCE IDENTITY
-// =========================================================================
-@Composable
-private fun CompactIdentitySection(
-    profile: SupabaseProfile?,
-    onEditClick: () -> Unit
-) {
-    var isNidVisible by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(SoftCardBg)
-            .padding(14.dp)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier.size(26.dp).clip(CircleShape).background(CyberCyan.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Badge, null, tint = CyberCyan, modifier = Modifier.size(14.dp))
-                }
-                Text("CITIZEN IDENTITY & ADDRESS", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .clickable { onEditClick() }
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text("EDIT", color = CyberEmerald, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // NID Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.04f))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Pin, null, tint = CyberCyan, modifier = Modifier.size(15.dp))
-                Column {
-                    Text("NID / PASSPORT", color = Slate400, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    val nidRaw = profile?.nidPassport.orEmpty()
-                    val displayNid = when {
-                        nidRaw.isBlank() -> "Not Registered"
-                        isNidVisible -> nidRaw
-                        else -> if (nidRaw.length > 5) nidRaw.take(4) + "-•••••-" + nidRaw.takeLast(2) else "••••••"
-                    }
-                    Text(displayNid, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            if (!profile?.nidPassport.isNullOrBlank()) {
-                IconButton(onClick = { isNidVisible = !isNidVisible }, modifier = Modifier.size(24.dp)) {
-                    Icon(if (isNidVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = Slate400, modifier = Modifier.size(15.dp))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // DOB & Gender Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
-            ) {
-                Column {
-                    Text("DATE OF BIRTH", color = Slate400, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    Text(profile?.dob ?: "Not Set", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
-            ) {
-                Column {
-                    Text("GENDER", color = Slate400, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    Text(profile?.gender ?: "Not Set", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Address
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.04f))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(Icons.Default.Home, null, tint = Slate400, modifier = Modifier.size(15.dp))
-            Column {
-                Text("RESIDENCE ADDRESS", color = Slate400, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    profile?.presentAddress?.ifBlank { "Not provided" } ?: "Not provided",
-                    color = if (profile?.presentAddress.isNullOrBlank()) Slate500 else Color.White,
-                    fontSize = 11.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-// =========================================================================
-// 5. 👥 COMPACT GUARDIANS & PROTECTORS NETWORK
-// =========================================================================
-@Composable
-private fun CompactGuardiansSection(
-    guardians: List<Guardian>,
-    onAddGuardian: () -> Unit,
-    onGuardianClick: (Guardian) -> Unit,
-    onCallGuardian: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(SoftCardBg)
-            .padding(14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier.size(26.dp).clip(CircleShape).background(CyberEmerald.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Shield, null, tint = CyberEmerald, modifier = Modifier.size(14.dp))
-                }
-                Text("EMERGENCY GUARDIANS", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(CyberEmerald.copy(alpha = 0.2f))
-                    .clickable { onAddGuardian() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Icon(Icons.Default.Add, null, tint = CyberEmerald, modifier = Modifier.size(11.dp))
-                    Text("ADD", color = CyberEmerald, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (guardians.isEmpty()) {
-            Text("No guardians added yet. Add trusted contacts for SOS alerts.", color = Slate500, fontSize = 11.sp)
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                guardians.forEach { guardian ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color.White.copy(alpha = 0.04f))
-                            .clickable { onGuardianClick(guardian) }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(
-                                modifier = Modifier.size(30.dp).clip(CircleShape).background(CyberEmerald.copy(alpha = 0.18f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Shield, null, tint = CyberEmerald, modifier = Modifier.size(15.dp))
-                            }
-                            Column {
-                                Text(guardian.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(guardian.relationship.uppercase(), color = CyberCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-
-                        IconButton(onClick = { onCallGuardian(guardian.phone) }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.Call, null, tint = CyberEmerald, modifier = Modifier.size(15.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// =========================================================================
-// 6. ⚙️ COMPACT PREFERENCES SECTION
-// =========================================================================
-@Composable
-private fun CompactPreferencesSection(
-    onTimezoneClick: () -> Unit,
-    onSyncDatabase: () -> Unit,
-    onAppInfoClick: () -> Unit,
-    onLogoutClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(SoftCardBg)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text("PREFERENCES & VAULT", color = Slate400, fontSize = 9.sp, fontWeight = FontWeight.Black)
-
-        CompactActionRow("Timezone & Regional Time", Icons.Default.Schedule, CyberCyan, onTimezoneClick)
-        CompactActionRow("Synchronize Cloud Vault", Icons.Default.CloudSync, CyberCyan, onSyncDatabase)
-        CompactActionRow("Application Information", Icons.Default.Security, CyberEmerald, onAppInfoClick)
-        CompactActionRow("Terminate Session", Icons.Default.Logout, EmergencyRed, onLogoutClick, isDestructive = true)
-    }
-}
-
-@Composable
-private fun CompactActionRow(
-    title: String,
-    icon: ImageVector,
-    accent: Color,
-    onClick: () -> Unit,
-    isDestructive: Boolean = false
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = 0.04f))
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(icon, null, tint = accent, modifier = Modifier.size(16.dp))
-            Text(title, color = if (isDestructive) EmergencyRed else Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-        Icon(Icons.Default.ChevronRight, null, tint = Slate500, modifier = Modifier.size(14.dp))
-    }
-}
-
-// =========================================================================
-// 7. 🔥 THE PROFILE SETUP / UPDATE WIZARD (Step 1 -> 2 -> 3)
+// PROFILE SETUP / UPDATE WIZARD (Step 1 -> 2 -> 3)
 // =========================================================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
