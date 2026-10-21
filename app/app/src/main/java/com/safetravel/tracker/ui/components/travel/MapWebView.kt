@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.safetravel.tracker.util.LocationHelper
 import com.safetravel.tracker.util.MapViewportCoordinator
+import com.safetravel.tracker.util.MapRouteUtils
 import com.safetravel.tracker.R
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.Manifest
@@ -398,6 +401,7 @@ fun NativeMapLibreView(
     val haptic = LocalHapticFeedback.current
     var orientationMode by remember { mutableStateOf(MapOrientationMode.NORTH_UP) }
     var isCameraLockedToUser by remember { mutableStateOf(true) }
+    var isRouteOverviewMode by remember { mutableStateOf(false) }
     val deviceHeading by rememberDeviceHeading(userBearing)
 
     // 1. Set Mapbox Access Token statically on load/update
@@ -554,6 +558,22 @@ fun NativeMapLibreView(
     var lastFetchedRouteDest by remember { mutableStateOf<Point?>(null) }
     var lastFetchedTransportMode by remember { mutableStateOf<Int?>(null) }
 
+    // Points collection spanning current user position, destination, and path for Route Overview bounds
+    val overviewRoutePoints: List<Point> = remember(userPoint, rawUserPoint, destCoords, fixedPlannedRoute, liveRoutePath, routeAlternatives, selectedRouteIndex) {
+        val list = mutableListOf<Point>()
+        (userPoint ?: rawUserPoint)?.let { list.add(it) }
+        destCoords?.let { list.add(Point.fromLngLat(it.second, it.first)) }
+        if (!fixedPlannedRoute.isNullOrEmpty()) {
+            list.addAll(fixedPlannedRoute)
+        } else {
+            routeAlternatives.getOrNull(selectedRouteIndex)?.points?.let { list.addAll(it) }
+        }
+        if (!liveRoutePath.isNullOrEmpty()) {
+            list.addAll(liveRoutePath)
+        }
+        list
+    }
+
     LaunchedEffect(rawUserPoint, startCoords, destCoords, navigationRouteActive, mapboxToken, transportMode, recordedPath, fixedPlannedRoute) {
         if (recordedPath != null || (fixedPlannedRoute != null && fixedPlannedRoute.isNotEmpty())) {
             routeAlternatives = emptyList()
@@ -654,9 +674,9 @@ fun NativeMapLibreView(
     var hasCenteredInSession by remember { mutableStateOf(false) }
 
     // Auto-center on user's current location on map load & smooth camera gliding during active travel
-    LaunchedEffect(resolvedUserCoords, hasLocationPermission) {
+    LaunchedEffect(smoothUserCoords, hasLocationPermission) {
         if (recordedPath == null && hasLocationPermission) {
-            resolvedUserCoords?.let { coords ->
+            smoothUserCoords?.let { coords ->
                 if (coords.first != 0.0 && coords.second != 0.0) {
                     val currentZoom = mapViewportState.cameraState?.zoom ?: 15.5
                     val effectiveZoom = if (currentZoom < 13.0) 15.5 else currentZoom
@@ -673,8 +693,8 @@ fun NativeMapLibreView(
                             zoom = 15.5,
                             bearing = 0.0
                         )
-                    } else if (isCameraLockedToUser) {
-                        MapViewportCoordinator.flyToLocation(
+                    } else if (isCameraLockedToUser && !isRouteOverviewMode) {
+                        MapViewportCoordinator.smoothPanToLocation(
                             viewportState = mapViewportState,
                             lat = coords.first,
                             lng = coords.second,
@@ -701,6 +721,7 @@ fun NativeMapLibreView(
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         if (event.changes.any { it.pressed }) {
                             isCameraLockedToUser = false
+                            isRouteOverviewMode = false
                         }
                     }
                 }
@@ -947,27 +968,46 @@ fun NativeMapLibreView(
             }
 
             // Live Traveled Trail (Breadcrumbs log from GPS/Supabase)
-            // Smoothly extends the breadcrumb trail to the user's current puck position without mutating prior fixes
+            // Perfectly anchors the tip of the traveled trail to the center of the user's puck at 60fps.
+            // Eliminates both disconnection gaps (behind puck) and overshoot hooks (ahead of puck).
             val displayedTraveledPath = remember(liveRoutePath, userPoint) {
-                if (liveRoutePath.isNullOrEmpty()) {
+                if (liveRoutePath.isNullOrEmpty() || liveRoutePath.size < 2) {
                     null
                 } else if (userPoint != null) {
-                    val last = liveRoutePath.lastOrNull()
-                    if (last != null) {
-                        val distResults = FloatArray(1)
-                        android.location.Location.distanceBetween(
-                            last.latitude(), last.longitude(),
-                            userPoint.latitude(), userPoint.longitude(),
-                            distResults
-                        )
-                        // If userPoint is within clean connecting range (1.0m to 35.0m), connect seamlessly to puck
-                        if (distResults[0] in 1.0f..35.0f) {
-                            liveRoutePath + userPoint
-                        } else {
-                            liveRoutePath
-                        }
-                    } else {
+                    val last = liveRoutePath.last()
+                    val distToLast = FloatArray(1)
+                    android.location.Location.distanceBetween(
+                        last.latitude(), last.longitude(),
+                        userPoint.latitude(), userPoint.longitude(),
+                        distToLast
+                    )
+
+                    // If user puck has already reached the last point (< 0.5m), render confirmed path
+                    if (distToLast[0] < 0.5f) {
                         liveRoutePath
+                    } else {
+                        val prev = liveRoutePath[liveRoutePath.size - 2]
+                        val distPrevToLast = FloatArray(1)
+                        android.location.Location.distanceBetween(
+                            prev.latitude(), prev.longitude(),
+                            last.latitude(), last.longitude(),
+                            distPrevToLast
+                        )
+
+                        val distPrevToUser = FloatArray(1)
+                        android.location.Location.distanceBetween(
+                            prev.latitude(), prev.longitude(),
+                            userPoint.latitude(), userPoint.longitude(),
+                            distPrevToUser
+                        )
+
+                        // If userPoint is interpolating towards the newly committed last fix:
+                        // Drop the future target and cleanly extend line directly to the current animated puck
+                        if (distPrevToUser[0] < distPrevToLast[0]) {
+                            liveRoutePath.dropLast(1) + userPoint
+                        } else {
+                            liveRoutePath + userPoint
+                        }
                     }
                 } else {
                     liveRoutePath
@@ -1100,8 +1140,10 @@ fun NativeMapLibreView(
         }
 
 
-        // Custom Overlay UI: Center on current user location trigger
+        // Custom Overlay UI: Center on current user location / Route Overview toggle (Google Maps style)
         val coroutineScope = rememberCoroutineScope()
+        val hasActiveRoute = overviewRoutePoints.size >= 2 || destCoords != null
+
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -1111,44 +1153,91 @@ fun NativeMapLibreView(
                 .size(46.dp)
                 .clip(CircleShape)
                 .background(Color(0xFF0F172A).copy(alpha = 0.85f))
-                .border(1.dp, Slate700, CircleShape)
+                .border(
+                    width = 1.dp,
+                    color = when {
+                        isRouteOverviewMode -> Color(0xFFF59E0B).copy(alpha = 0.6f)
+                        isCameraLockedToUser -> Color(0xFF06B6D4).copy(alpha = 0.6f)
+                        else -> Slate700
+                    },
+                    shape = CircleShape
+                )
                 .clickable {
                     if (!hasLocationPermission) {
                         showLocationDisclosure = true
                         return@clickable
                     }
-                    isCameraLockedToUser = true
-                    orientationMode = MapOrientationMode.NORTH_UP
-                    coroutineScope.launch {
-                        try {
-                            val loc = LocationHelper.getCurrentLocation(context)
-                            val (lat, lng) = if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
-                                onDeviceLocationChanged(loc.latitude, loc.longitude)
-                                Pair(loc.latitude, loc.longitude)
-                            } else {
-                                resolvedUserCoords ?: startCoords ?: Pair(0.0, 0.0)
-                            }
-                            if (lat != 0.0 && lng != 0.0) {
-                                val targetLoc = Point.fromLngLat(lng, lat)
+
+                    if (isRouteOverviewMode) {
+                        // In Route Overview mode: Tap toggles back to close-up Follow Mode
+                        isRouteOverviewMode = false
+                        isCameraLockedToUser = true
+                        orientationMode = MapOrientationMode.NORTH_UP
+                        coroutineScope.launch {
+                            val targetPt = userPoint ?: rawUserPoint
+                            if (targetPt != null) {
                                 mapViewportState.flyTo(
                                     CameraOptions.Builder()
-                                        .center(targetLoc)
+                                        .center(targetPt)
                                         .zoom(15.5)
                                         .bearing(0.0)
+                                        .pitch(0.0)
                                         .build()
                                 )
                             }
-                        } catch (e: Exception) {
-                            val fallback = resolvedUserCoords ?: startCoords
-                            if (fallback != null && fallback.first != 0.0 && fallback.second != 0.0) {
-                                val targetLoc = Point.fromLngLat(fallback.second, fallback.first)
-                                mapViewportState.flyTo(
-                                    CameraOptions.Builder()
-                                        .center(targetLoc)
-                                        .zoom(15.0)
-                                        .bearing(0.0)
-                                        .build()
-                                )
+                        }
+                    } else if (isCameraLockedToUser && hasActiveRoute) {
+                        // Already locked on user with an active route/destination: Tap switches to Route Overview
+                        isRouteOverviewMode = true
+                        val bounds = MapRouteUtils.calculateRouteBounds(overviewRoutePoints, userPoint ?: rawUserPoint)
+                        coroutineScope.launch {
+                            mapViewportState.flyTo(
+                                CameraOptions.Builder()
+                                    .center(bounds.center)
+                                    .zoom((bounds.zoom - 0.4).coerceIn(8.5, 16.0))
+                                    .bearing(0.0)
+                                    .pitch(0.0)
+                                    .build()
+                            )
+                        }
+                    } else {
+                        // Either camera was dragged away, or no route active: Re-center on user in Follow Mode
+                        isCameraLockedToUser = true
+                        isRouteOverviewMode = false
+                        orientationMode = MapOrientationMode.NORTH_UP
+                        coroutineScope.launch {
+                            try {
+                                val loc = LocationHelper.getCurrentLocation(context)
+                                val (lat, lng) = if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
+                                    onDeviceLocationChanged(loc.latitude, loc.longitude)
+                                    Pair(loc.latitude, loc.longitude)
+                                } else {
+                                    resolvedUserCoords ?: startCoords ?: Pair(0.0, 0.0)
+                                }
+                                if (lat != 0.0 && lng != 0.0) {
+                                    val targetLoc = Point.fromLngLat(lng, lat)
+                                    mapViewportState.flyTo(
+                                        CameraOptions.Builder()
+                                            .center(targetLoc)
+                                            .zoom(15.5)
+                                            .bearing(0.0)
+                                            .pitch(0.0)
+                                            .build()
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                val fallback = resolvedUserCoords ?: startCoords
+                                if (fallback != null && fallback.first != 0.0 && fallback.second != 0.0) {
+                                    val targetLoc = Point.fromLngLat(fallback.second, fallback.first)
+                                    mapViewportState.flyTo(
+                                        CameraOptions.Builder()
+                                            .center(targetLoc)
+                                            .zoom(15.0)
+                                            .bearing(0.0)
+                                            .pitch(0.0)
+                                            .build()
+                                    )
+                                }
                             }
                         }
                     }
@@ -1156,9 +1245,21 @@ fun NativeMapLibreView(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.MyLocation,
-                contentDescription = "Center live location",
-                tint = if (isCameraLockedToUser) Color(0xFF06B6D4) else Emerald400,
+                imageVector = when {
+                    isRouteOverviewMode -> Icons.Default.Directions
+                    isCameraLockedToUser && hasActiveRoute -> Icons.Default.Navigation
+                    else -> Icons.Default.MyLocation
+                },
+                contentDescription = when {
+                    isRouteOverviewMode -> "Exit route overview"
+                    isCameraLockedToUser && hasActiveRoute -> "Show route overview"
+                    else -> "Center on current location"
+                },
+                tint = when {
+                    isRouteOverviewMode -> Color(0xFFF59E0B)
+                    isCameraLockedToUser -> Color(0xFF06B6D4)
+                    else -> Emerald400
+                },
                 modifier = Modifier.size(22.dp)
             )
         }

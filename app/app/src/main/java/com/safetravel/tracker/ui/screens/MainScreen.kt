@@ -147,6 +147,9 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
 
     // Version Log Navigation State
     var showVersionLog by remember { mutableStateOf(false) }
+
+    // Live Beacon Navigation State
+    var showLiveBeacon by remember { mutableStateOf(false) }
     
     // Guardian Tracking State
     var watchTripId by remember { mutableStateOf<String?>(null) }
@@ -163,6 +166,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
     // Helper to clear sub-navigation states
     fun resetSubScreens() {
         showVersionLog = false
+        showLiveBeacon = false
         showWeather = false
         showThana = false
         showFireService = false
@@ -239,6 +243,8 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
             watchTripId = null
         } else if (selectedTip != null) {
             selectedTip = null
+        } else if (showLiveBeacon) {
+            showLiveBeacon = false
         } else if (showSafetyTips) {
             showSafetyTips = false
         } else if (showEmergencyContacts) {
@@ -454,11 +460,25 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                                 icon = Icons.Default.People,
                                 iconTint = Color(0xFF10B981),
                                 label = "Guardians & Live Watch",
-                                isSelected = selectedTab == 3 && !showEmergencyContacts && !showSafetyTips,
+                                isSelected = selectedTab == 3 && !showEmergencyContacts && !showSafetyTips && !showLiveBeacon,
                                 onClick = {
                                     scope.launch { drawerState.close() }
                                     resetSubScreens()
                                     selectedTab = 3
+                                }
+                            )
+
+                            SidebarMenuItem(
+                                icon = Icons.Default.Sensors,
+                                iconTint = Color(0xFF06B6D4),
+                                label = "Live Beacon Engine",
+                                badgeText = if (activeTrip != null) "LIVE" else null,
+                                badgeColor = Color(0xFF10B981),
+                                isSelected = showLiveBeacon,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    resetSubScreens()
+                                    showLiveBeacon = true
                                 }
                             )
 
@@ -628,7 +648,7 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                         // 1. LEFT SIDE: Menu Bar (Drawer Toggle) or Back Button
-                        val isSubscreen = showVersionLog || showWeather || showThana || showFireService ||
+                        val isSubscreen = showVersionLog || showLiveBeacon || showWeather || showThana || showFireService ||
                                 showHospitals || showBloodBanks || showEmergencyContacts || (showSafetyTips && selectedTip != null) ||
                                 selectedNews != null
 
@@ -800,6 +820,8 @@ fun MainTabbedLayout(vm: SafeTravelViewModel) {
                         BloodBankScreen(vm = vm, onBack = { showBloodBanks = false })
                     } else if (showEmergencyContacts) {
                         EmergencyContactScreen(vm = vm, onBack = { showEmergencyContacts = false })
+                    } else if (showLiveBeacon) {
+                        LiveBeaconScreen(vm = vm, onBack = { showLiveBeacon = false })
                     } else if (watchTripId != null) {
                         key(watchTripId) {
                             GuardianLiveMapScreen(vm = vm, tripId = watchTripId!!, onBack = { watchTripId = null })

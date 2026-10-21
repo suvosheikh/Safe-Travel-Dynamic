@@ -78,7 +78,7 @@ object LocationHelper {
             intervalMs
         ).apply {
             setMinUpdateIntervalMillis(intervalMs / 2)
-            setMinUpdateDistanceMeters(1.0f) // Fine-grained stream so AdaptiveLocationFilter can smoothly process trajectory
+            setMinUpdateDistanceMeters(0.5f) // Fine-grained stream for natural pedestrian and vehicular tracking
             setWaitForAccurateLocation(false)
         }.build()
 

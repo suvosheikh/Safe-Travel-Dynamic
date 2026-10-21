@@ -97,34 +97,34 @@ class AdaptiveLocationFilter {
 
         when (transportMode) {
             MODE_WALK -> {
-                maxAllowedAccuracy = 24.0f
+                maxAllowedAccuracy = 30.0f
                 maxPlausibleSpeedMps = 10.0f // ~36 km/h max human sprint
                 stillSpeedThresholdMps = 0.5f
-                stillDistanceThresholdMeters = 3.0f
-                processNoiseQ = 2.0 // High smoothing to keep footpath track straight
+                stillDistanceThresholdMeters = 2.0f
+                processNoiseQ = 8.0 // Responsive tracking to keep pace with footsteps
             }
             MODE_CYCLE -> {
-                maxAllowedAccuracy = 28.0f
+                maxAllowedAccuracy = 32.0f
                 maxPlausibleSpeedMps = 22.0f // ~80 km/h max cycle sprint
                 stillSpeedThresholdMps = 0.6f
-                stillDistanceThresholdMeters = 3.5f
-                processNoiseQ = 6.0 // Balanced smoothing for bike lane
+                stillDistanceThresholdMeters = 2.5f
+                processNoiseQ = 10.0
             }
             MODE_BUS -> {
                 maxAllowedAccuracy = 35.0f
                 maxPlausibleSpeedMps = 42.0f // ~150 km/h
                 stillSpeedThresholdMps = 0.8f
-                stillDistanceThresholdMeters = 4.5f
+                stillDistanceThresholdMeters = 3.5f
                 val currentSpeed = if (rawLocation.hasSpeed()) rawLocation.speed else 0f
-                processNoiseQ = if (currentSpeed > 6.0f) 16.0 else 7.0
+                processNoiseQ = if (currentSpeed > 6.0f) 18.0 else 12.0
             }
             else -> { // MODE_CAR (Default)
                 maxAllowedAccuracy = 35.0f
                 maxPlausibleSpeedMps = 50.0f // ~180 km/h
                 stillSpeedThresholdMps = 0.8f
-                stillDistanceThresholdMeters = 4.5f
+                stillDistanceThresholdMeters = 3.5f
                 val currentSpeed = if (rawLocation.hasSpeed()) rawLocation.speed else 0f
-                processNoiseQ = if (currentSpeed > 6.0f) 18.0 else 8.0
+                processNoiseQ = if (currentSpeed > 6.0f) 20.0 else 14.0
             }
         }
 
@@ -137,7 +137,7 @@ class AdaptiveLocationFilter {
         // 1.1 Degraded Accuracy Check (bounced radio waves under Metro Rail/tall buildings)
         val prevSpeed = if (prev.hasSpeed()) prev.speed else impliedSpeedMps.toFloat()
         val effectiveMaxAccuracy = if (prevSpeed < 3.0f) {
-            minOf(maxAllowedAccuracy, 24.0f) // Stricter accuracy limit during slow traffic/stops to reject building bounces
+            minOf(maxAllowedAccuracy, 28.0f)
         } else {
             maxAllowedAccuracy
         }
@@ -148,15 +148,14 @@ class AdaptiveLocationFilter {
         }
 
         // 1.2 Speed-Aware Dynamic Teleportation Check (Catches 20-30m jumps during slow travel)
-        // Dynamic maximum plausible speed based on current travel pace + physical acceleration limit (4.5 m/s^2)
         val maxPlausibleAccelerationMps2 = 4.5f
         val dynamicPlausibleSpeedMps = maxOf(
-            4.0f, // Allow at least ~14 km/h sudden takeoff from standstill
+            4.0f,
             prevSpeed + (maxPlausibleAccelerationMps2 * deltaTimeSec.toFloat())
         ).coerceAtMost(maxPlausibleSpeedMps)
 
         val maxAllowedDistanceForInterval = maxOf(
-            7.5f,
+            8.0f,
             (dynamicPlausibleSpeedMps * deltaTimeSec.toFloat()) + (rawAccuracy * 0.35f)
         )
 
@@ -165,15 +164,32 @@ class AdaptiveLocationFilter {
             return null
         }
 
-        // STAGE 2: Stillness / Deadband Locking (Prevents jitter at traffic lights & stops)
-        val isStationary = (rawLocation.hasSpeed() && rawLocation.speed < stillSpeedThresholdMps) ||
-                (impliedSpeedMps < stillSpeedThresholdMps) ||
-                (prevSpeed < stillSpeedThresholdMps && rawDistanceMoved < 5.0f)
-        
-        if (isStationary && rawDistanceMoved < stillDistanceThresholdMeters) {
+        // Dynamic deadband threshold:
+        // Indoors or in dense urban canyons where accuracy is degraded (accuracy > 10m),
+        // GPS multipath bounce produces 2-5m false jumps. We scale the deadband dynamically.
+        // Outdoors with high satellite lock (accuracy <= 8m), the deadband remains tight (2.0m)
+        // so actual walking footsteps are tracked without delay.
+        val dynamicStillDistanceMeters = if (rawAccuracy > 10.0f) {
+            maxOf(stillDistanceThresholdMeters, minOf(rawAccuracy * 0.30f, 7.5f))
+        } else {
+            stillDistanceThresholdMeters
+        }
+
+        // STAGE 2: Stillness / Micro-Jitter Deadband (Eliminate indoor dancing and false 4 km/h speed)
+        val hasHwSpeed = rawLocation.hasSpeed()
+        val hwSpeed = if (hasHwSpeed) rawLocation.speed else 0.0f
+        val isHwStationary = hasHwSpeed && hwSpeed < stillSpeedThresholdMps
+        val isImpliedStationary = impliedSpeedMps < stillSpeedThresholdMps
+
+        val isStationary = (isHwStationary || isImpliedStationary) && rawDistanceMoved < dynamicStillDistanceMeters
+
+        if (isStationary) {
             // User/vehicle is stationary. Hold previous position rock-solid to eliminate map dancing
             lastTimestampMs = currentTimestamp
-            return prev
+            // Explicitly clamp speed to 0 so speedometer HUD stays at 0 km/h
+            return Location(prev).apply {
+                speed = 0.0f
+            }
         }
 
         // STAGE 3: 2D Adaptive Kalman Filter
@@ -192,8 +208,9 @@ class AdaptiveLocationFilter {
         val effectiveAccuracy = max(rawAccuracy, 3.0f)
         val measurementNoiseR = (effectiveAccuracy * effectiveAccuracy).toDouble()
 
-        // Kalman Gain K
-        val kalmanGainK = varianceP / (varianceP + measurementNoiseR)
+        // Kalman Gain K with responsive clamp so location tracks real footsteps without lagging
+        val rawKalmanGainK = varianceP / (varianceP + measurementNoiseR)
+        val kalmanGainK = rawKalmanGainK.coerceIn(0.40, 0.95)
 
         // Correction step
         val smoothedDy = dyMeters * kalmanGainK
@@ -213,6 +230,10 @@ class AdaptiveLocationFilter {
             // Smoothed accuracy estimate
             if (hasAccuracy()) {
                 accuracy = (effectiveAccuracy * (1.0f - (kalmanGainK * 0.4f).toFloat())).coerceAtLeast(2.0f)
+            }
+            // Clamp speed if displacement is below stillness threshold
+            if (rawDistanceMoved < dynamicStillDistanceMeters || (hasSpeed() && speed < stillSpeedThresholdMps)) {
+                speed = 0.0f
             }
         }
 

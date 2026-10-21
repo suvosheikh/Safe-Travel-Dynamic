@@ -106,4 +106,25 @@ object MapViewportCoordinator {
                 .build()
         )
     }
+
+    /**
+     * Smoothly keeps the camera centered on the user during continuous tracking
+     * without triggering Mapbox's dramatic flight curve / zoom dip.
+     */
+    fun smoothPanToLocation(
+        viewportState: MapViewportState,
+        lat: Double,
+        lng: Double,
+        zoom: Double = DEFAULT_STREET_ZOOM,
+        bearing: Double = 0.0
+    ) {
+        if (lat == 0.0 && lng == 0.0) return
+        val targetZoom = if (zoom < 13.0) DEFAULT_STREET_ZOOM else zoom
+        viewportState.setCameraOptions {
+            center(Point.fromLngLat(lng, lat))
+            zoom(targetZoom)
+            bearing(bearing)
+            pitch(0.0)
+        }
+    }
 }

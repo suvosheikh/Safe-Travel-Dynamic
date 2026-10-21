@@ -889,6 +889,38 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /**
+     * Starts an instant one-tap Live Safety Beacon without requiring destination or pin setting.
+     * Uses current GPS position as origin and broadcasts live telemetry to all connected guardians.
+     */
+    fun startLiveBeacon(shares: List<String> = emptyList()) {
+        val currentLoc = currentLocationName.value.ifBlank { "Current Location" }
+        val battery = com.safetravel.tracker.util.BatteryHelper.getCurrentBatteryLevel(getApplication())
+        val defaultShares = if (shares.isNotEmpty()) shares else userGuardians.value.map { it.phone }
+        startTrip(
+            start = currentLoc,
+            end = "Open Journey (Live Beacon)",
+            battery = battery,
+            vehicle = "GPS Beacon Engine",
+            vehicleDesc = "Instant live beacon tracking",
+            modeInt = travelTransportMode.value,
+            sharedPhones = defaultShares,
+            plannedRoute = emptyList(),
+            estimatedDistanceKm = null,
+            estimatedDurationMin = null,
+            vehiclePhoto = null
+        )
+    }
+
+    /**
+     * Stops the active Live Safety Beacon and safely persists completed voyage metrics.
+     */
+    fun stopLiveBeacon() {
+        val battery = com.safetravel.tracker.util.BatteryHelper.getCurrentBatteryLevel(getApplication())
+        val dist = activeTrip.value?.totalDistance
+        endTrip(battery = battery, distance = dist)
+    }
+
     fun endTrip(battery: Int? = null, distance: Double? = null) {
         val trip = activeTrip.value ?: return
         val profile = userProfile.value ?: return
@@ -1587,6 +1619,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private var lastDbCheckpointTimeMs: Long = 0L
+    private var lastBroadcastTimeMs: Long = 0L
 
     fun updateLiveCoordinatesInSupabase(lat: Double, lng: Double) {
         val currentTrip = activeTrip.value ?: return
@@ -1611,52 +1644,66 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
             val currentBat = com.safetravel.tracker.util.BatteryHelper.getCurrentBatteryLevel(context)
             activeRoutePath.value = updatedPath
             activeTrip.value = currentTrip.copy(
+                currentLat = correctedLat,
+                currentLng = correctedLng,
                 routePathLog = updatedPath,
                 endBatteryLevel = currentBat
             )
             com.safetravel.tracker.util.ActiveTripTrailCache.saveTrail(context, currentTrip.id, updatedPath)
 
-            // 2. High-performance, 0ms Persistent WebSocket Broadcast (Near-zero egress, zero DB load)
-            val speed = currentSpeedKmh.value
-            val heading = lastFilteredLocation?.bearing ?: 0f
-            SupabaseRealtimeBroadcaster.sendLocation(
-                lat = correctedLat,
-                lng = correctedLng,
-                speedKmh = speed,
-                heading = heading,
-                battery = currentBat
-            )
+            // 2. High-performance, Throttled Persistent WebSocket Broadcast (Near-zero egress, zero DB load)
+            val now = System.currentTimeMillis()
+            if (now - lastBroadcastTimeMs >= 3000L) {
+                lastBroadcastTimeMs = now
+                val speed = currentSpeedKmh.value
+                val heading = lastFilteredLocation?.bearing ?: 0f
+                SupabaseRealtimeBroadcaster.sendLocation(
+                    lat = correctedLat,
+                    lng = correctedLng,
+                    speedKmh = speed,
+                    heading = heading,
+                    battery = currentBat
+                )
+            }
 
-            // 3. Live Database Update with complete route_path_log history and current battery
-            if (SupabaseManager.isConfigured) {
-                try {
-                    val authHeader = "Bearer ${SupabaseManager.currentSessionToken}"
-                    val updates = mutableMapOf<String, Any>(
-                        "current_lat" to lat,
-                        "current_lng" to lng,
-                        "route_path_log" to updatedPath,
-                        "end_battery_level" to currentBat
-                    )
-                    
-                    val response = SupabaseManager.dbService?.updateTrip(
-                        idQuery = "eq.${currentTrip.id}",
-                        updates = updates,
-                        userAuth = authHeader
-                    )
-                    if (response?.isSuccessful == true && !response.body().isNullOrEmpty()) {
-                        android.util.Log.d("Telemetry", "Supabase live coords, route_path_log, and battery updated ($currentBat%). Points: ${updatedPath.size}")
+            // 3. Periodic Database Checkpoint (Every 25s or on SOS) to protect Supabase free-tier egress/IOPS
+            val isSosActive = currentTrip.status == "sos"
+            val shouldCheckpointDb = isSosActive || (now - lastDbCheckpointTimeMs >= 25000L)
+
+            if (shouldCheckpointDb) {
+                lastDbCheckpointTimeMs = now
+                if (SupabaseManager.isConfigured) {
+                    try {
+                        val authHeader = "Bearer ${SupabaseManager.currentSessionToken}"
+                        val updates = mutableMapOf<String, Any>(
+                            "current_lat" to correctedLat,
+                            "current_lng" to correctedLng,
+                            "route_path_log" to updatedPath,
+                            "end_battery_level" to currentBat
+                        )
+                        
+                        val response = SupabaseManager.dbService?.updateTrip(
+                            idQuery = "eq.${currentTrip.id}",
+                            updates = updates,
+                            userAuth = authHeader
+                        )
+                        if (response?.isSuccessful == true && !response.body().isNullOrEmpty()) {
+                            android.util.Log.d("Telemetry", "Supabase checkpoint saved ($currentBat%). Points: ${updatedPath.size}")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("Telemetry", "Failed to checkpoint coords to Supabase", e)
                     }
-                } catch (e: Exception) {
-                    android.util.Log.e("Telemetry", "Failed to upload live coords to Supabase", e)
-                }
-            } else {
-                // Mock update
-                val mockIndex = SupabaseManager.mockTrips.indexOfFirst { it.id == currentTrip.id }
-                if (mockIndex != -1) {
-                    SupabaseManager.mockTrips[mockIndex] = SupabaseManager.mockTrips[mockIndex].copy(
-                        routePathLog = updatedPath,
-                        endBatteryLevel = currentBat
-                    )
+                } else {
+                    // Local memory update
+                    val mockIndex = SupabaseManager.mockTrips.indexOfFirst { it.id == currentTrip.id }
+                    if (mockIndex != -1) {
+                        SupabaseManager.mockTrips[mockIndex] = SupabaseManager.mockTrips[mockIndex].copy(
+                            currentLat = correctedLat,
+                            currentLng = correctedLng,
+                            routePathLog = updatedPath,
+                            endBatteryLevel = currentBat
+                        )
+                    }
                 }
             }
         }
@@ -1738,9 +1785,9 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         currentSpeedKmh.value = speedKmh
 
         val lastLoc = lastFilteredLocation
-        val calculatedBearing = if (smoothed.hasBearing() && smoothed.bearing != 0f) {
+        val calculatedBearing = if (speedKmh >= 2 && smoothed.hasBearing() && smoothed.bearing != 0f) {
             smoothed.bearing
-        } else if (lastLoc != null && smoothed.distanceTo(lastLoc) >= 2f && speedKmh >= 2) {
+        } else if (lastLoc != null && smoothed.distanceTo(lastLoc) >= 2.5f && speedKmh >= 2) {
             lastLoc.bearingTo(smoothed)
         } else {
             currentBearing.value
@@ -1793,7 +1840,7 @@ class SafeTravelViewModel(application: Application) : AndroidViewModel(applicati
         locationUpdatesJob = viewModelScope.launch {
             try {
                 // Primary: Google Play Services Fused Location with hardware sensor fusion & deadband filtering
-                LocationHelper.getLocationUpdates(context, intervalMs = 3000).collect { loc ->
+                LocationHelper.getLocationUpdates(context, intervalMs = 1200).collect { loc ->
                     onFilteredLocationReceived(loc)
                 }
             } catch (e: Exception) {
